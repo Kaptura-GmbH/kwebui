@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link id="theme-stylesheet" rel="stylesheet" href="/themes/{{ theme }}.css">
+</head>
+<body>
+  <div id="topbar-root"></div>
+  <main id="app-root"{% if width is not none %} style="--sg-app-width: {{ width }}px;"{% endif %}></main>
+
+  <script src="/static/js/vendor/vue.global.js"></script>
+  <script src="/static/js/core.js"></script>
+  <script src="/static/js/renderer.js"></script>
+  <script src="/static/js/shortkeys.js"></script>
+  {% for script in widget_scripts %}
+  <script src="/static/js/widgets/{{ script }}"></script>
+  {% endfor %}
+  <script src="/static/js/websocket.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,641 @@
+/* Structural styles only -- all colors come from theme CSS variables
+   defined in themes/*.css, so a theme switch never needs a widget change. */
+
+:root {
+  --sg-sidebar-width: 260px;
+  --sg-container-border-width: 1px;
+  --sg-container-border-radius: 8px;
+  --sg-container-border-color: var(--sg-border);
+  --sg-container-padding-vertical: 10px;
+  --sg-container-padding-horizontal: 10px;
+  --sg-table-border-width: 1px;
+  --sg-table-border-color: var(--sg-border);
+  /* Dedicated hooks for button color, rather than reusing --sg-accent/
+     --sg-accent-fg directly -- same reasoning as the container-border
+     variables above: a custom stylesheet can restyle buttons alone
+     without also restyling every other accent-colored element (sliders,
+     etc.). Defaulting to var(--sg-accent)/var(--sg-accent-fg) means this
+     adds a hook without changing any current rendering -- overriding
+     these two here still cascades to buttons in every theme, exactly as
+     if a theme's own light.css/dark.css had set them directly. */
+  --sg-button-bg: var(--sg-accent);
+  --sg-button-text-color: var(--sg-accent-fg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* Reserves the vertical scrollbar's width up front, on the actual
+     viewport-scrolling element (html, not body, is what scrolls here --
+     body has no overflow of its own set) -- without this, a page that
+     starts shorter than the viewport and later grows past it (e.g. a
+     container.clear()+rebuild, a widget appearing from a callback) would
+     shift every widget sideways by the scrollbar's width the instant it
+     appears, and shift back if it's removed. "stable" reserves that
+     space unconditionally, whether or not a scrollbar is showing right
+     now, so nothing ever shifts. */
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+}
+
+/* Reserving the sidebar's width via body's own padding (rather than a
+   margin-left on #app-root directly) means #app-root's *existing*
+   `margin: 0 auto` centers it correctly within the space actually left
+   over -- both margins resolve to auto and split the remaining slack
+   evenly. A margin-left on #app-root itself would instead leave only
+   margin-right free to absorb 100% of that slack (per CSS's auto-margin
+   resolution when just one side is fixed), which pins #app-root flush
+   against the sidebar instead of centering it -- the more space to the
+   right of a wide viewport, the more visibly off-center that looks.
+   #topbar-root (a separate top-level region under <body>, see
+   topbar.js) gets the same reduced width for free from this single
+   rule, with no separate sidebar-aware CSS of its own needed -- body
+   padding narrows the available area for every direct child uniformly. */
+body.sg-has-sidebar {
+  padding-left: var(--sg-sidebar-width);
+  transition: padding-left 0.2s ease;
+}
+
+body.sg-has-sidebar.sg-sidebar-collapsed {
+  padding-left: 0;
+}
+
+@media (max-width: 640px) {
+  body.sg-has-sidebar {
+    padding-left: 0;
+  }
+}
+
+#app-root {
+  /* Overridable per-app via KApp(width=...) -- see app.py's docstring and
+     index.html, which sets this custom property inline only when a width
+     was actually passed, so the fallback here is the one place the
+     original fixed value lives. */
+  max-width: var(--sg-app-width, 720px);
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sg-text {
+  margin: 0;
+}
+
+.sg-button {
+  width: max-content;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--sg-border);
+  border-radius: 6px;
+  background: var(--sg-button-bg);
+  color: var(--sg-button-text-color);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.sg-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sg-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.sg-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+[data-highlighted="true"] {
+  outline: 2px solid var(--sg-highlight-color, var(--sg-highlight, #dc2626));
+  outline-offset: 2px;
+}
+
+.sg-textedit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 320px;
+}
+
+.sg-textedit input,
+.sg-textedit textarea {
+  padding: 0.5rem;
+  border: 1px solid var(--sg-border);
+  border-radius: 6px;
+  background: var(--sg-input-bg);
+  color: var(--sg-fg);
+  font: inherit;
+}
+
+.sg-listbox {
+  padding: 0.5rem;
+  border: 1px solid var(--sg-border);
+  border-radius: 6px;
+  background: var(--sg-input-bg);
+  color: var(--sg-fg);
+  max-width: 320px;
+}
+
+.sg-progress {
+  width: 100%;
+  max-width: 320px;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: var(--sg-border);
+  overflow: hidden;
+}
+
+.sg-progress-bar {
+  height: 100%;
+  background: var(--sg-accent);
+  transition: width 0.2s ease;
+}
+
+.sg-progress.sg-indeterminate .sg-progress-bar {
+  width: 40% !important;
+  animation: sg-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes sg-indeterminate {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+.sg-image {
+  max-width: 100%;
+  border-radius: 6px;
+  display: block;
+}
+
+.sg-imagestream {
+  max-width: 100%;
+  border-radius: 6px;
+  display: block;
+  background: #000;
+}
+
+.sg-empty {
+  display: contents;
+}
+
+/* The fieldset itself (`.sg-container`) is deliberately NOT the flex
+   container for its children -- that job belongs to the inner
+   `.sg-container-body` div instead (see container.js). This split exists
+   to work around a real Chromium/Blink rendering bug: a `<fieldset
+   display:flex>` whose own parent is *also* a flex container silently
+   fails to apply `justify-content` on its main axis -- align-items
+   (cross-axis, e.g. `horizontal_alignment`) still works, but a fixed
+   `height` + `vertical_alignment="center"` renders the child pinned at
+   the top instead of centered, even though getComputedStyle correctly
+   reports `justify-content: center`. Since every `container()` in this
+   framework is always used inside another flex-column (#app-root,
+   sidebar, another container, ...), that trigger condition is not an
+   edge case here -- it fires every time. Confirmed in isolation: a plain
+   `<div>` in the exact same nested position centers correctly; swapping
+   only the element type (fieldset -> div) fixes it. `.sg-container`
+   (the fieldset) keeps just the border/legend/caption box and this
+   container's own width -- `.sg-container-body` (the inner div) is a
+   normal, non-flex-parented block child, so it never triggers the bug,
+   and gets the actual flex-column/gap/height/alignment behavior instead.
+   Border color/width/radius are dedicated --sg-container-* variables
+   (base.css :root) rather than reused sidebar/image ones, so overriding
+   a container's border in a custom stylesheet doesn't also touch the
+   sidebar or images. It's a real <fieldset> so a <legend> caption breaks
+   the top border line for free, via the browser's own fieldset/legend
+   rendering -- the reset below clears every UA default fieldset/legend
+   brings along (margin, padding, border, min-width) so nothing shows up
+   uninvited when border/caption are both off. */
+.sg-container {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.sg-container[data-border="true"] {
+  border: var(--sg-container-border-width) solid var(--sg-container-border-color);
+}
+
+.sg-container-caption {
+  padding: 0 0.4em;
+  margin-left: 0.5rem;
+  color: var(--sg-fg);
+}
+
+.sg-container[data-rounded="true"] {
+  border-radius: var(--sg-container-border-radius);
+}
+
+.sg-container-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  /* Theme-provided default -- container.js only sets an inline
+     `padding` (which always wins over this rule, regardless of
+     specificity) when `vertical_padding`/`horizontal_padding` was
+     explicitly passed; left unset, this is what actually renders. */
+  padding: var(--sg-container-padding-vertical) var(--sg-container-padding-horizontal);
+}
+
+/* Border color/width are dedicated --sg-table-* variables (this file's
+   own :root), same reasoning as the container's border: restyling a
+   table's border shouldn't also restyle the container's or sidebar's. */
+.sg-table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.sg-table th,
+.sg-table td {
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+}
+
+.sg-table th {
+  background: var(--sg-input-bg);
+  font-weight: 600;
+}
+
+.sg-table[data-border="true"] th,
+.sg-table[data-border="true"] td {
+  border: var(--sg-table-border-width) solid var(--sg-table-border-color);
+}
+
+.sg-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sg-sidebar-width);
+  overflow-y: auto;
+  padding: 1.5rem 1.25rem;
+  background: var(--sg-input-bg);
+  border-right: 1px solid var(--sg-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 10;
+  transition: transform 0.2s ease;
+}
+
+.sg-sidebar[data-collapsed="true"] {
+  transform: translateX(-100%);
+}
+
+.sg-sidebar-toggle {
+  position: fixed;
+  top: 0.75rem;
+  left: calc(var(--sg-sidebar-width) + 0.75rem);
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--sg-border);
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Must stay above .sg-topbar-sticky (z-index: 20) -- when both a
+     sidebar and a sticky topbar are used together, the toggle's fixed
+     position (just right of the sidebar's edge) falls inside the
+     topbar's own screen area, and the collapse control must always
+     stay clickable regardless of what else is on the page. */
+  z-index: 21;
+  transition: left 0.2s ease;
+}
+
+.sg-columns {
+  display: flex;
+  align-items: flex-start;
+}
+
+.sg-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sg-html {
+  max-width: 100%;
+}
+
+.sg-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 320px;
+}
+
+.sg-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sg-slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--sg-accent);
+}
+
+.sg-slider-value {
+  min-width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sg-file-uploader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 320px;
+}
+
+.sg-file-uploader-status {
+  font-size: 0.85rem;
+  color: var(--sg-fg);
+  opacity: 0.75;
+}
+
+.sg-spinner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sg-spinner[data-active="false"] {
+  display: none;
+}
+
+.sg-spinner-ring {
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid var(--sg-border);
+  border-top-color: var(--sg-accent);
+  border-radius: 50%;
+  animation: sg-spin 0.8s linear infinite;
+}
+
+@keyframes sg-spin {
+  to { transform: rotate(360deg); }
+}
+
+.sg-toast {
+  position: fixed;
+  right: 1rem;
+  max-width: 320px;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--sg-border);
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  z-index: 1000;
+  transition: top 0.2s ease;
+}
+
+.sg-toast-success { border-color: #16a34a; }
+.sg-toast-info { border-color: #2563eb; }
+.sg-toast-warning { border-color: #d97706; }
+.sg-toast-error { border-color: #dc2626; }
+
+.sg-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--sg-border);
+}
+
+.sg-alert-success { background: rgba(22, 163, 74, 0.12); border-color: #16a34a; }
+.sg-alert-info { background: rgba(37, 99, 235, 0.12); border-color: #2563eb; }
+.sg-alert-warning { background: rgba(217, 119, 6, 0.12); border-color: #d97706; }
+.sg-alert-error { background: rgba(220, 38, 38, 0.12); border-color: #dc2626; }
+
+.sg-popup {
+  border: 1px solid var(--sg-border);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  max-width: 360px;
+  background: var(--sg-bg);
+  color: var(--sg-fg);
+}
+
+.sg-popup::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.sg-popup-title {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.sg-popup-message {
+  margin: 0 0 1.25rem;
+}
+
+.sg-popup-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.sg-popup-buttons button {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--sg-border);
+  border-radius: 6px;
+  background: var(--sg-input-bg);
+  color: var(--sg-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sg-popup-buttons button:hover {
+  filter: brightness(1.08);
+}
+
+.sg-popup-buttons .sg-popup-btn-primary {
+  background: var(--sg-accent);
+  color: var(--sg-accent-fg);
+  border-color: var(--sg-accent);
+}
+
+.sg-json {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: var(--sg-input-bg);
+  border: 1px solid var(--sg-border);
+  color: var(--sg-fg);
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Full width for free: unlike #app-root, #topbar-root (see topbar.js)
+   has no max-width/centering of its own, so .sg-topbar just needs
+   width: 100% -- no viewport-relative breakout math needed. */
+.sg-topbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--sg-bg);
+  border-bottom: 1px solid var(--sg-border);
+}
+
+.sg-topbar > * {
+  flex: 1;
+}
+
+.sg-topbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.sg-tracker {
+  display: flex;
+  width: 100%;
+}
+
+.sg-tracker-horizontal {
+  align-items: flex-start;
+  /* Safety net: if there are enough steps (or long enough titles) that
+     even fully-shrunk/ellipsized labels can't all fit, the tracker
+     scrolls internally instead of forcing the whole page wider than
+     the viewport (see decisions.md). */
+  overflow-x: auto;
+}
+
+.sg-tracker-vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.sg-tracker-step {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  /* Without this, a step's default flex min-width is its content's
+     min-content size -- which, for nowrap title text, is that text's
+     full unbroken width. With several steps that adds up to more than
+     many real viewports, forcing the whole page wider rather than
+     letting titles truncate (see .sg-tracker-title's text-overflow). */
+  min-width: 0;
+}
+
+.sg-tracker-connector {
+  flex: none;
+  background: var(--sg-border);
+}
+
+.sg-tracker-horizontal .sg-tracker-connector {
+  flex: 1;
+  height: 2px;
+  margin-top: 1rem;
+}
+
+.sg-tracker-vertical .sg-tracker-connector {
+  width: 2px;
+  min-height: 1.25rem;
+  margin-left: 1rem;
+}
+
+.sg-tracker-connector-filled {
+  background: var(--sg-fg);
+  opacity: 0.6;
+}
+
+.sg-tracker-circle {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: var(--sg-border);
+  color: var(--sg-fg);
+  opacity: 0.55;
+}
+
+.sg-tracker-label {
+  min-width: 0;
+}
+
+.sg-tracker-title {
+  font-weight: 500;
+  color: var(--sg-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sg-tracker-detail {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sg-tracker-status-completed .sg-tracker-circle {
+  background: var(--sg-fg);
+  color: var(--sg-bg);
+  opacity: 1;
+}
+
+.sg-tracker-status-in-progress .sg-tracker-circle {
+  background: var(--sg-accent);
+  color: var(--sg-accent-fg);
+  opacity: 1;
+}
+
+.sg-tracker-status-in-progress .sg-tracker-title {
+  font-weight: 700;
+}
+
+.sg-tracker-status-pending .sg-tracker-title {
+  opacity: 0.55;
+}
+
+.sg-tracker-status-error .sg-tracker-circle {
+  background: #dc2626;
+  color: #fff;
+  opacity: 1;
+}
+
+.sg-tracker-status-error .sg-tracker-title {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.sg-tracker-status-error .sg-tracker-detail {
+  color: #dc2626;
+  opacity: 0.75;
+}

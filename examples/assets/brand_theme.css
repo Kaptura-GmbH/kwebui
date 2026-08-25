@@ -1,0 +1,14 @@
+/* Example custom theme for examples/custom_theme.py -- a plain CSS file
+   living in your own project, not inside the installed kwebui package.
+   Defines the same --sg-* custom properties as kwebui/themes/light.css/
+   dark.css; anything left undefined here just falls back to the
+   browser's own initial/inherited value wherever it's used. */
+:root {
+  --sg-bg: #0f172a;
+  --sg-fg: #e2e8f0;
+  --sg-border: #334155;
+  --sg-input-bg: #1e293b;
+  --sg-accent: #f59e0b;
+  --sg-accent-fg: #0f172a;
+  --sg-highlight: #ef4444;
+}
