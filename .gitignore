@@ -34,7 +34,9 @@ graphify-out
 decisions.md
 milestones.md
 
-#docs/class-diagram.md
-#docs/architecture.md
+docs/class-diagram.md
+docs/architecture.md
 
 tests/
+
+Readme
