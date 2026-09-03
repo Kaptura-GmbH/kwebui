@@ -16,6 +16,7 @@ import contextvars
 import itertools
 import re
 import socket
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -199,6 +200,17 @@ class KApp:
             # propagates contextvars, so app.session still resolves
             # correctly inside the callback despite running on another thread.
             await asyncio.to_thread(plugin.handle_event, widget, event)
+        except Exception:
+            # A bug in one widget's callback (or a hardware/library error an
+            # app author didn't guard against) must not end this browser's
+            # entire live session. The only thing reading further events
+            # from this browser is the while-loop in websocket.py, and it
+            # only tolerates WebSocketDisconnect -- anything else escaping
+            # from here would kill the WebSocket, leaving every OTHER
+            # widget on the page unresponsive too until the page is
+            # reloaded. Printed (not swallowed) so the traceback is still
+            # visible server-side, same as an uncaught exception would be.
+            traceback.print_exc()
         finally:
             _current_session.reset(token)
 

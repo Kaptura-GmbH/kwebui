@@ -83,7 +83,16 @@ class ImageStreamWidget(Widget):
         loop = asyncio.get_running_loop()
         while True:
             started = loop.time()
-            frame = await loop.run_in_executor(None, provider)
+            try:
+                frame = await loop.run_in_executor(None, provider)
+            except Exception:
+                # A provider that raises instead of returning b"" (e.g. a
+                # camera's get_image() timing out right after stream_on())
+                # must not kill this loop -- there would be no restart:
+                # _ensure_provider_running() only ever starts it once, so an
+                # unhandled exception here would freeze the stream forever
+                # with no visible error. Treat it like a dropped frame.
+                frame = None
             if frame:
                 self.push_frame(frame)
 
