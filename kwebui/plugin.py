@@ -67,6 +67,7 @@ class WidgetPlugin:
             "highlighted": widget.highlighted,
             "highlight_color": widget.highlight_color,
             "visible": widget.visible,
+            "enabled": widget.enabled,
         }
 
     def default_style(self) -> dict[str, str]:

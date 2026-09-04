@@ -194,8 +194,8 @@ from a callback, to change what's on screen without a page reload. Every
 widget also has `.highlight()`/`.unhighlight()` (see
 [Highlighting a widget](#highlighting-a-widget) below), `.focus()`
 (see [Sending keyboard focus](#sending-keyboard-focus) below), and
-`.hide()`/`.show()`/`.remove()` (see
-[Hiding, showing, and removing a widget](#hiding-showing-and-removing-a-widget)
+`.hide()`/`.show()`/`.remove()`/`.enable()`/`.disable()` (see
+[Hiding, showing, removing, and disabling a widget](#hiding-showing-removing-and-disabling-a-widget)
 below), regardless of type.
 
 Quick reference, then a screenshot for each one below:
@@ -631,7 +631,7 @@ room between the border and what's inside. Change either later with
 
 Like every widget, a container can be hidden and shown without losing
 its content — `container.hide()` / `container.show()` (see
-[Hiding, showing, and removing a widget](#hiding-showing-and-removing-a-widget));
+[Hiding, showing, removing, and disabling a widget](#hiding-showing-removing-and-disabling-a-widget));
 nothing container-specific needed, since that mechanism is generic
 across every widget type.
 
@@ -860,7 +860,7 @@ Unlike `.highlight()`, focus is a one-shot action, not persistent state —
 a browser that connects later never "replays" a focus that already
 happened.
 
-## 7. Hiding, showing, and removing a widget
+## 7. Hiding, showing, removing, and disabling a widget
 
 Any widget — not just a specific type — can be hidden and later shown
 again, or removed for good:
@@ -892,6 +892,26 @@ else:
 tree entirely and tells every connected browser to remove it, rather
 than just hiding it. There is no corresponding "un-remove"; call
 `.hide()` instead if you might want the widget back later.
+
+```python
+self.button("Disable", on_click=lambda: self.name.disable())
+self.button("Enable", on_click=lambda: self.name.enable())
+```
+
+`.disable()`/`.enable()` work the same way, on any widget, for
+*interactivity* rather than visibility: a disabled widget stays visible
+but stops responding — a click, keystroke, selection, or shortkey
+addressed to it is dropped before it ever reaches your callback, exactly
+as if the browser had sent nothing at all. It's dimmed and shows a
+"not-allowed" cursor generically; `button`/`checkbox`/`textedit`/
+`slider`/`listbox`/`file_uploader` additionally get their native
+control's own `disabled` attribute, so a disabled text field or dropdown
+can't be typed into or operated by keyboard either, not just clicked.
+`widget.enabled` (bool) is readable directly, same as `visible` above.
+`button` also keeps its original `enabled=True` constructor kwarg and
+`.set_enabled(bool)` method as convenience aliases for the same
+mechanism — `self.button("Save", enabled=False)` and
+`self.name.disable()` end up in the same state.
 
 ## 8. Themes
 

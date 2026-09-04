@@ -47,6 +47,7 @@ class Showcase(KApp):
         self.checkbox("Enable feature", on_change=lambda checked: print("checkbox:", checked))
 
         self.name = self.textedit("Name", placeholder="Jane Doe")
+        self.button("Hide btn", on_click=lambda: self.name.hide())
         self.button("Highlight Name", on_click=self.toggle_name_highlight)
         self.button("Focus Name", on_click=lambda: self.name.focus())
         self.textedit("Bio", multiline=True, placeholder="Tell us about yourself")
@@ -63,6 +64,12 @@ class Showcase(KApp):
         self.button("Hide", on_click=self.removable.hide)
         self.button("Show", on_click=self.removable.show)
         self.button("Remove permanently", on_click=lambda: self.removable.remove())
+
+        self.text("Enable, disable", size=18, bold=True)
+        self.disableable_button = self.button("Click me", on_click=lambda: print("clicked"))
+        self.disableable_edit = self.textedit("Disableable field", placeholder="type here")
+        self.button("Disable button + field", on_click=self.disable_demo_widgets)
+        self.button("Enable button + field", on_click=self.enable_demo_widgets)
 
         self.text("Keyboard shortcuts", size=18, bold=True)
         self.text("Press 'g' anywhere on the page (not while typing in a field).", color="#6b7280")
@@ -228,6 +235,16 @@ class Showcase(KApp):
             self.name.unhighlight()
         else:
             self.name.highlight()
+
+    def disable_demo_widgets(self) -> None:
+        # enable()/disable() work on any widget, not just button/textedit
+        # -- see kwebui/widget.py.
+        self.disableable_button.disable()
+        self.disableable_edit.disable()
+
+    def enable_demo_widgets(self) -> None:
+        self.disableable_button.enable()
+        self.disableable_edit.enable()
 
     def on_popup_answer(self, answer: str) -> None:
         self.toast(f"Popup answered: {answer}", level="info")

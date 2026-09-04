@@ -190,6 +190,13 @@ class KApp:
         widget = self.page.find(widget_id)
         if widget is None:
             return
+        if not widget.enabled:
+            # A disabled widget (widget.disable(), generic across every
+            # widget type) must not react to a browser-originated event
+            # no matter what the frontend sent -- this is the one place
+            # that's enforced, so no individual plugin's handle_event()
+            # needs its own "am I enabled" check.
+            return
         plugin = self.registry.get(widget.widget_type)
         event = Event(widget_id=widget_id, type=event_type, payload=payload)
         token = _current_session.set(session)

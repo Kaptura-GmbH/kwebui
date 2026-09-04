@@ -10,6 +10,7 @@ registerWidget("file_uploader", {
         ref="input"
         :accept="data.props.accept || ''"
         :multiple="!!data.props.multiple"
+        :disabled="data.enabled === false"
         @change="onChange"
       >
       <span class="sg-file-uploader-status">{{ statusText }}</span>

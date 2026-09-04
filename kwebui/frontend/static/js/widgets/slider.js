@@ -15,6 +15,7 @@ registerWidget("slider", {
           :min="data.props.min_value"
           :max="data.props.max_value"
           :step="data.props.step"
+          :disabled="data.enabled === false"
           @input="onInput"
         >
         <span ref="valueEl" class="sg-slider-value"></span>

@@ -11,8 +11,11 @@ from ..widget import Widget
 
 class ButtonWidget(Widget):
     def set_enabled(self, enabled: bool) -> "ButtonWidget":
-        self.update(enabled=enabled)
-        return self
+        """Convenience alias for the generic ``enable()``/``disable()``
+        (see ``Widget``) -- kept as a named method (and ``enabled=`` at
+        construction, below) since both predate the generic mechanism
+        and are part of button's existing public API."""
+        return self.enable() if enabled else self.disable()
 
     def set_text(self, text: str) -> "ButtonWidget":
         self.update(text=text)
@@ -88,21 +91,28 @@ class ButtonPlugin(WidgetPlugin):
         """
         props = {
             "text": text,
-            "enabled": enabled,
             "on_click": on_click,
             "shortkey": shortkey,
             "color": color,
             "text_color": text_color,
         }
-        return ButtonWidget(widget_id, self.widget_name, props)
+        widget = ButtonWidget(widget_id, self.widget_name, props)
+        # `enabled` predates (and is kept alongside) the generic
+        # Widget.enabled/enable()/disable() mechanism -- set the field
+        # directly rather than going through enable()/disable(), which
+        # broadcast; there's nothing to broadcast to yet at construction
+        # time (no _app wired up, no browser connected).
+        widget.enabled = enabled
+        return widget
 
     def handle_event(self, widget: Widget, event: Event) -> None:
         # "shortkey" (fired by the frontend's global keydown listener once
         # it's matched, visible, and enabled -- see shortkeys.js) is
-        # treated identically to a real "click": same callback, same
-        # enabled guard, so a keyboard-triggered press can never bypass
-        # what a mouse click itself already respects.
-        if event.type in ("click", "shortkey") and widget.props.get("enabled", True):
+        # treated identically to a real "click": same callback. No
+        # `enabled` check needed here -- KApp._dispatch_event already
+        # drops any event addressed to a disabled widget before this
+        # method is ever called, generically for every widget type.
+        if event.type in ("click", "shortkey"):
             callback = widget.props.get("on_click")
             if callback is not None:
                 callback()

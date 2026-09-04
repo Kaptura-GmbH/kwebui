@@ -74,7 +74,7 @@ document.addEventListener("keydown", (event) => {
 
   const typing = isTypingTarget(document.activeElement);
   for (const widget of widgets) {
-    if (widget.props.enabled === false) continue;
+    if (widget.enabled === false) continue;
     if (!eventMatchesShortkey(event, widget.props.shortkey)) continue;
 
     const parsed = parseShortkey(widget.props.shortkey);

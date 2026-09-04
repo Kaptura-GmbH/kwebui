@@ -17,7 +17,7 @@ registerWidget("button", {
     },
   },
   template: `
-    <button type="button" class="sg-button" :style="colorStyle" :disabled="data.props.enabled === false" @click="onClick">
+    <button type="button" class="sg-button" :style="colorStyle" :disabled="data.enabled === false" @click="onClick">
       {{ data.props.text }}
     </button>
   `,

@@ -33,6 +33,7 @@ class Widget:
         self.highlighted: bool = False
         self.highlight_color: str | None = None
         self.visible: bool = True
+        self.enabled: bool = True
         self._app: "KApp | None" = None
 
     def update(self, **props: Any) -> "Widget":
@@ -81,6 +82,41 @@ class Widget:
     def show(self) -> "Widget":
         """Reveal a widget previously hidden by ``hide()``."""
         self.visible = True
+        if self._app is not None:
+            self._app._on_widget_changed(self)
+        return self
+
+    def disable(self) -> "Widget":
+        """Make this widget inert, generically across every widget type
+        (button, checkbox, textedit, slider, listbox, file_uploader,
+        container's shortkey, ...) -- not just the handful that happen to
+        have their own notion of "enabled".
+
+        Enforcement lives in one place, ``KApp._dispatch_event``: a
+        browser-originated event addressed to a disabled widget is
+        dropped before it ever reaches that widget type's own
+        ``handle_event()``, so no plugin needs its own "am I enabled"
+        check (previously ``button`` re-implemented this itself; every
+        other widget type had no way to be disabled at all). The
+        frontend mirrors this visually for every widget generically
+        (dimmed, not clickable -- see ``renderer.js``'s ``nodeStyle``)
+        and, for the widgets with a real native form control, also sets
+        that element's own ``disabled`` attribute (see each widget's
+        ``.js`` file) so a disabled `textedit`/`listbox`/`slider` can't
+        be typed into or operated via keyboard either, not just clicked.
+
+        Reversible via ``enable()``; unlike ``remove()``, the widget and
+        its state stay exactly as they were, and unlike ``hide()`` it
+        stays visible, just inert."""
+        self.enabled = False
+        if self._app is not None:
+            self._app._on_widget_changed(self)
+        return self
+
+    def enable(self) -> "Widget":
+        """Allow a widget disabled by ``disable()`` to respond to
+        interaction again."""
+        self.enabled = True
         if self._app is not None:
             self._app._on_widget_changed(self)
         return self

@@ -13,6 +13,7 @@ registerWidget("textedit", {
         v-if="data.props.multiline"
         ref="field"
         :placeholder="data.props.placeholder"
+        :disabled="data.enabled === false"
         @input="onInput"
       ></textarea>
       <input
@@ -20,6 +21,7 @@ registerWidget("textedit", {
         ref="field"
         :type="data.props.password ? 'password' : 'text'"
         :placeholder="data.props.placeholder"
+        :disabled="data.enabled === false"
         @input="onInput"
         @keydown.enter="onEnter"
       >

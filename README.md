@@ -172,6 +172,9 @@ self.name.focus()              # send keyboard focus to it
 self.name.hide()                # visually hide it (stays in the tree, keeps its state)
 self.name.show()                # reveal it again
 self.name.remove()              # drop it from the page and server memory for good
+
+self.name.disable()             # stays visible, but stops responding to clicks/typing/etc.
+self.name.enable()              # respond to interaction again
 ```
 
 ## Themes

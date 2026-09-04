@@ -3,7 +3,7 @@
 registerWidget("listbox", {
   props: ["data"],
   template: `
-    <select class="sg-listbox" ref="select" @change="onChange">
+    <select class="sg-listbox" ref="select" :disabled="data.enabled === false" @change="onChange">
       <option v-for="(item, index) in data.props.items || []" :key="index">{{ item }}</option>
     </select>
   `,

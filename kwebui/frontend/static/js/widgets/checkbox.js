@@ -4,7 +4,7 @@ registerWidget("checkbox", {
   props: ["data"],
   template: `
     <label class="sg-checkbox">
-      <input type="checkbox" :checked="!!data.props.checked" @change="onChange">
+      <input type="checkbox" :checked="!!data.props.checked" :disabled="data.enabled === false" @change="onChange">
       <span>{{ data.props.label }}</span>
     </label>
   `,

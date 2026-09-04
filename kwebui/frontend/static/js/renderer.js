@@ -22,10 +22,23 @@ vueApp.component("widget-node", {
     // so the "hidden" -> display:none translation lives here once rather
     // than in each widget's own component.
     nodeStyle() {
-      const style =
+      let style =
         this.data.highlighted && this.data.highlight_color
           ? { ...this.data.style, "--sg-highlight-color": this.data.highlight_color }
           : this.data.style;
+      // Generic across every widget type, same reasoning as visible's
+      // display:none above: dims it and blocks mouse interaction (click,
+      // hover) with no per-widget code needed. Mouse-only, though --
+      // pointer-events:none can't stop keyboard interaction with an
+      // already-focused/tabbed-to native control, so the widgets with a
+      // real <input>/<select>/<textarea>/<button> additionally bind that
+      // element's own `disabled` attribute themselves (see e.g.
+      // textedit.js) for full keyboard robustness. Either way,
+      // KApp._dispatch_event is the actual, authoritative enforcement --
+      // this is purely the visual/UX cue.
+      if (this.data.enabled === false) {
+        style = { ...style, opacity: 0.5, pointerEvents: "none", cursor: "not-allowed" };
+      }
       if (this.data.visible === false) return { ...style, display: "none" };
       return style;
     },
