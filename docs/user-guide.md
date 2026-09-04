@@ -217,8 +217,9 @@ Quick reference, then a screenshot for each one below:
 | [Json](#json) | `self.json({"status": "ok", "items": [1, 2, 3]})` |
 | [Table](#table) | `self.table([{"name": "Alice", "age": 30}], width=-1, stretch=False, border=True, hide_header=False)` |
 | [Empty](#empty) | `slot = self.empty(); slot.text("Loading...")` |
-| [Container](#container) | `page = self.container(width=-1, height=-1, stretch=False, border=True, border_roundness=True, caption="", horizontal_alignment=None, vertical_alignment=None, shortkey=None, on_keypress=None, vertical_padding=None, horizontal_padding=None); page.text("Hi"); page.clear()` |
+| [Container](#container) | `page = self.container(width=-1, height=-1, stretch=False, border=True, border_roundness=True, caption="", direction="vertical", wrap=False, horizontal_alignment=None, vertical_alignment=None, shortkey=None, on_keypress=None, vertical_padding=None, horizontal_padding=None); page.text("Hi"); page.clear()` |
 | [Alerts: success, info, warning, error](#alerts-success-info-warning-error) | `self.success("Saved!")`, `self.info(...)`, `self.warning(...)`, `self.error(...)` |
+| [Badge](#badge) | `self.badge("New")` / `self.badge("Active", icon="✅", color="success")` |
 | [Toast](#toast) | `self.toast("Saved!", level="success", duration_ms=4000)` |
 | [Columns](#layout-columns-and-sidebar) | `left, right = self.columns(2)` or `narrow, wide = self.columns([0.3, 0.7])` |
 | [Sidebar](#layout-columns-and-sidebar) | `nav = self.sidebar()` / `self.sidebar(collapsible=False)` |
@@ -536,6 +537,32 @@ caption just sits above the content as a plain label. Change it later
 with `container.set_caption(...)`.
 
 ```python
+row = self.container(direction="horizontal")
+row.text("test1")
+row.text("test2")   # side by side instead of stacked
+
+flow = self.container(direction="horizontal", wrap=True, width=260)
+for label in ("New", "Beta", "Active", "Deprecated", "Failed"):
+    flow.badge(label)   # wraps onto further lines once a row no longer fits
+```
+
+`direction` (`"vertical"`, the default, or `"horizontal"`) is the axis
+children are laid out on. This gives a flexible "row" distinct from
+[Columns](#layout-columns-and-sidebar): `columns(n)` divides the row into
+`n` fixed-width slots regardless of what's inside each one, while a
+horizontal `container()` sizes each child to its own natural size and
+only wraps (with `wrap=True`) once a row no longer fits — a natural fit
+for a row of [Badge](#badge)s or short buttons, not a page grid.
+`wrap` (default `False`) is only meaningful combined with
+`direction="horizontal"`; left `False`, children that don't fit on one
+line either overflow (scrollable — see the note below) or get squeezed,
+same as any ordinary flex row. Change either later with
+`container.set_direction(...)` / `.set_wrap(...)`; an invalid `direction`
+raises `ValueError` immediately. `horizontal_alignment`/
+`vertical_alignment` (below) keep working the same way regardless of
+`direction` — see the note under them.
+
+```python
 box = self.container(width=500, horizontal_alignment="center")
 box.button("Centered button")
 
@@ -566,6 +593,11 @@ bug, so reach for an explicit alignment only where you actually want that
 shrink-then-align look. Change either later with
 `container.set_horizontal_alignment(...)` / `.set_vertical_alignment(...)`
 (pass `None` to go back to the default).
+
+`horizontal_alignment`/`vertical_alignment` keep their *meaning*
+regardless of `direction` — `horizontal_alignment` always positions
+children along the horizontal axis, `vertical_alignment` always along
+the vertical one, whether `direction` is `"vertical"` or `"horizontal"`.
 
 ```python
 app.container(shortkey="ctrl+j", on_keypress=open_command_palette)
@@ -626,6 +658,26 @@ Four colored status banners — call any of them straight from a callback
 ![Info banner](images/widget-alert-info.png)
 ![Warning banner](images/widget-alert-warning.png)
 ![Error banner](images/widget-alert-error.png)
+
+### Badge
+
+```python
+self.badge("New")
+self.badge("Beta", color="info")
+self.badge("Active", icon="✅", color="success")
+self.badge("Deprecated", color="warning")
+self.badge("Failed", icon="🚫", color="error")
+```
+
+A small pill-shaped status/tag label, Streamlit `st.badge` style. `color`
+is one of `"success"`, `"info"`, `"warning"`, `"error"` (the same
+semantic colors as the alert banners above) or `None` for a neutral,
+theme-colored badge; `icon` is an optional leading emoji. Unlike the
+alert banners, a badge is a small inline-sized element (not a full-width
+banner) — a natural fit for a status tag next to a `text()` in a
+`columns()` row or a table cell, not a page-level notice.
+
+![Badge widget](images/widget-badge.png)
 
 ### Toast
 

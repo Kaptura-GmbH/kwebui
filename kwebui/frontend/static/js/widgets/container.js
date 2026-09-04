@@ -22,6 +22,20 @@ registerWidget("container", {
       const height = this.data.props.height;
       return height > 0 ? { height: `${height}px` } : {};
     },
+    // flex-direction: row for direction="horizontal" -- children laid out
+    // side by side at their own natural size, rather than stacked (the
+    // "vertical" default, which omits the key so the class rule's own
+    // `flex-direction: column` applies -- byte-identical to before this
+    // prop existed). wrap only really matters combined with horizontal,
+    // but is passed straight through as flex-wrap regardless: CSS accepts
+    // it either way and there's no reason for this widget to police the
+    // combination itself.
+    directionStyle() {
+      const style = {};
+      if (this.data.props.direction === "horizontal") style.flexDirection = "row";
+      if (this.data.props.wrap) style.flexWrap = "wrap";
+      return style;
+    },
     // This container's own align-items/justify-content, positioning ITS
     // children -- unrelated to widthStyle above, which is about how THIS
     // container itself is sized/positioned within its own parent. Maps
@@ -33,12 +47,20 @@ registerWidget("container", {
     // existed -- see create()'s docstring in container.py for why that
     // matters (alert/listbox/textedit/slider all lean on the inherited
     // default).
+    //
+    // horizontal_alignment/vertical_alignment keep their *meaning*
+    // ("along the horizontal/vertical axis") regardless of direction, but
+    // which flex property that maps to (align-items vs. justify-content)
+    // depends on which axis is currently the flex main axis -- swapped
+    // here for direction="horizontal", where the main axis is horizontal
+    // instead of the column default's vertical.
     alignStyle() {
       const style = {};
       const h = { left: "flex-start", center: "center", right: "flex-end" }[this.data.props.horizontal_alignment];
-      if (h) style.alignItems = h;
       const v = { top: "flex-start", center: "center", bottom: "flex-end" }[this.data.props.vertical_alignment];
-      if (v) style.justifyContent = v;
+      const horizontalDirection = this.data.props.direction === "horizontal";
+      if (h) style[horizontalDirection ? "justifyContent" : "alignItems"] = h;
+      if (v) style[horizontalDirection ? "alignItems" : "justifyContent"] = v;
       return style;
     },
     // null/undefined (the default -- Python's None) means "use the
@@ -76,7 +98,7 @@ registerWidget("container", {
       :data-rounded="!!data.props.border_roundness"
     >
       <legend v-if="data.props.caption" class="sg-container-caption">{{ data.props.caption }}</legend>
-      <div class="sg-container-body" :style="[heightStyle, alignStyle, paddingStyle]">
+      <div class="sg-container-body" :style="[heightStyle, directionStyle, alignStyle, paddingStyle]">
         <slot></slot>
       </div>
     </fieldset>

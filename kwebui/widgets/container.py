@@ -28,6 +28,14 @@ from ..plugin import WidgetPlugin
 from ..widget import Widget
 
 
+_DIRECTIONS = ("vertical", "horizontal")
+
+
+def _validate_direction(direction: str) -> None:
+    if direction not in _DIRECTIONS:
+        raise ValueError(f"container direction must be one of {_DIRECTIONS}, got {direction!r}.")
+
+
 class ContainerWidget(Widget):
     def set_width(self, width: float) -> "ContainerWidget":
         """Resize the container. -1 or 0 falls back to sizing to its
@@ -64,6 +72,19 @@ class ContainerWidget(Widget):
         """Change the caption shown breaking the top border line.
         Pass "" to remove it."""
         self.update(caption=caption)
+        return self
+
+    def set_direction(self, direction: str) -> "ContainerWidget":
+        """Change the axis children are laid out on. One of "vertical"
+        (default) or "horizontal" -- see ``create()``'s docstring."""
+        _validate_direction(direction)
+        self.update(direction=direction)
+        return self
+
+    def set_wrap(self, wrap: bool) -> "ContainerWidget":
+        """Toggle whether children wrap onto additional lines once they
+        no longer fit -- see ``create()``'s docstring."""
+        self.update(wrap=wrap)
         return self
 
     def set_horizontal_alignment(self, horizontal_alignment: str | None) -> "ContainerWidget":
@@ -148,6 +169,10 @@ class ContainerPlugin(WidgetPlugin):
         wide = app.container(stretch=True, border=False)
         titled = app.container(caption="Settings")  # caption breaks the top border line
         centered = app.container(width=400, horizontal_alignment="center")
+        row = app.container(direction="horizontal")  # children side by side instead of stacked
+        row.text("test1")
+        row.text("test2")
+        flow = app.container(direction="horizontal", wrap=True)  # ... wrapping onto new lines once they don't fit
         panel = app.container(height=300, vertical_alignment="center")  # a fixed-height "panel"
         panel.button("Centered")  # ... vertically centered inside it
         app.container(shortkey="ctrl+k", on_keypress=open_search)  # fires while this container is visible
@@ -166,6 +191,8 @@ class ContainerPlugin(WidgetPlugin):
         border: bool = True,
         border_roundness: bool = True,
         caption: str = "",
+        direction: str = "vertical",
+        wrap: bool = False,
         horizontal_alignment: str | None = None,
         vertical_alignment: str | None = None,
         shortkey: str | None = None,
@@ -173,7 +200,31 @@ class ContainerPlugin(WidgetPlugin):
         vertical_padding: float | None = None,
         horizontal_padding: float | None = None,
     ) -> ContainerWidget:
-        """``horizontal_alignment`` ("left"/"center"/"right") and
+        """``direction`` ("vertical", the default, or "horizontal") is the
+        axis children are laid out on -- "horizontal" lines them up side
+        by side (each kept at its own natural size) instead of stacked.
+        ``wrap`` (default ``False``) additionally lets children flow onto
+        further lines once a row no longer fits, rather than overflowing
+        or being squeezed -- only meaningful combined with
+        ``direction="horizontal"``. Together these give a flexible "row"
+        layout distinct from ``columns()``: `columns(n)` divides the row
+        into `n` fixed-width slots regardless of what's inside each one,
+        while a horizontal ``container()`` sizes each child to its own
+        content and only moves to a new line when it must, e.g. a row of
+        `badge()`s or short buttons. An invalid ``direction`` raises
+        ``ValueError`` immediately rather than silently rendering the
+        default axis.
+
+        ``horizontal_alignment``/``vertical_alignment`` (below) keep their
+        *meaning* regardless of ``direction`` -- "horizontal_alignment"
+        always positions children along the horizontal axis and
+        "vertical_alignment" along the vertical one. Internally this
+        means the two swap which CSS flex property they map to
+        (`align-items`/`justify-content`) when ``direction="horizontal"``,
+        since the flex main axis itself has swapped -- this is handled
+        for you; the params behave the same way from the outside.
+
+        ``horizontal_alignment`` ("left"/"center"/"right") and
         ``vertical_alignment`` ("top"/"center"/"bottom") position children
         within the container's own box, once that box is bigger than its
         content -- e.g. a fixed ``width`` wider than the children, or a
@@ -226,6 +277,7 @@ class ContainerPlugin(WidgetPlugin):
         so it doesn't move the border/caption themselves, only the room
         between the border and what's inside.
         """
+        _validate_direction(direction)
         props = {
             "width": width,
             "height": height,
@@ -233,6 +285,8 @@ class ContainerPlugin(WidgetPlugin):
             "border": border,
             "border_roundness": border_roundness,
             "caption": caption,
+            "direction": direction,
+            "wrap": wrap,
             "horizontal_alignment": horizontal_alignment,
             "vertical_alignment": vertical_alignment,
             "shortkey": shortkey,

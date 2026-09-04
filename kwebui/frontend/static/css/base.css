@@ -248,6 +248,14 @@ body.sg-has-sidebar.sg-sidebar-collapsed {
      specificity) when `vertical_padding`/`horizontal_padding` was
      explicitly passed; left unset, this is what actually renders. */
   padding: var(--sg-container-padding-vertical) var(--sg-container-padding-horizontal);
+  /* Safety net for direction="horizontal" without wrap: if children
+     don't all fit on one line, this scrolls internally instead of
+     forcing the whole page wider than the viewport (same pattern as
+     .sg-tracker-horizontal). No effect on the vertical default, where
+     content is already kept from overflowing horizontally by
+     min-width: 0 above plus each child's own max-width handling
+     (verified in tests/oversize_images_demo.py). */
+  overflow-x: auto;
 }
 
 /* Border color/width are dedicated --sg-table-* variables (this file's
@@ -429,6 +437,35 @@ body.sg-has-sidebar.sg-sidebar-collapsed {
 .sg-alert-info { background: rgba(37, 99, 235, 0.12); border-color: #2563eb; }
 .sg-alert-warning { background: rgba(217, 119, 6, 0.12); border-color: #d97706; }
 .sg-alert-error { background: rgba(220, 38, 38, 0.12); border-color: #dc2626; }
+
+/* width: max-content (not align-self: flex-start) so a parent's own
+   align-items (e.g. container's horizontal_alignment) can still
+   position it -- see image.js's widthStyle comment for the full
+   reasoning; every widget that needs to opt out of a flex parent's
+   default align-items: stretch follows this same pattern. */
+.sg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: max-content;
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--sg-input-bg);
+  color: var(--sg-fg);
+  border: 1px solid var(--sg-border);
+}
+
+/* Same four status colors as .sg-alert-*, just applied as pill
+   text+border instead of a banner background, per this codebase's
+   convention of one consistent status-color set across alert/toast/
+   popup/highlight/workflow_tracker. */
+.sg-badge-success { background: rgba(22, 163, 74, 0.12); border-color: #16a34a; color: #16a34a; }
+.sg-badge-info { background: rgba(37, 99, 235, 0.12); border-color: #2563eb; color: #2563eb; }
+.sg-badge-warning { background: rgba(217, 119, 6, 0.12); border-color: #d97706; color: #d97706; }
+.sg-badge-error { background: rgba(220, 38, 38, 0.12); border-color: #dc2626; color: #dc2626; }
 
 .sg-popup {
   border: 1px solid var(--sg-border);

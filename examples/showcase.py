@@ -110,6 +110,13 @@ class Showcase(KApp):
         self.warning("This is a warning message.")
         self.error("This is an error message.")
 
+        self.text("Badges", size=18, bold=True)
+        self.badge("New")
+        self.badge("Beta", color="info")
+        self.badge("Active", icon="✅", color="success")
+        self.badge("Deprecated", color="warning")
+        self.badge("Failed", icon="🚫", color="error")
+
         self.text("File upload", size=18, bold=True)
         self.file_uploader("Upload a file", on_upload=self.on_upload)
 
@@ -169,6 +176,15 @@ class Showcase(KApp):
             vertical_padding=16, horizontal_padding=40,
         )
         padded.text("Breathing room around this text, instead of flush against the border.")
+        row = self.container(direction="horizontal", caption="direction='horizontal': children side by side")
+        row.text("test1")
+        row.text("test2")
+        flow = self.container(
+            direction="horizontal", wrap=True, width=260,
+            caption="direction='horizontal', wrap=True",
+        )
+        for label in ("New", "Beta", "Active", "Deprecated", "Failed"):
+            flow.badge(label)
         self.hideable_container = self.container(caption="Hideable")
         self.hideable_container.text("This whole container can be hidden or shown.")
         self.button("Hide container", on_click=self.hideable_container.hide)
