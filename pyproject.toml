@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "kwebui"
-version = "0.10.4"
+dynamic = ["version"]
 description = "Build web UIs in pure Python. A clean, plugin-oriented alternative to Streamlit."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -44,6 +44,26 @@ imagestream = [
 file_uploader = [
     "python-multipart>=0.0.9",
 ]
+
+[tool.setuptools_scm]
+# Derives the version from the nearest git tag at build/install time
+# (both this repo's "v1.2.3" and bare "1.2.3" tag styles match the
+# default tag regex) instead of a hand-maintained [project].version --
+# that field silently stayed "0.10.4" through the v0.10.5/v0.10.6/v0.11.0
+# tags because nothing ever forced it to be updated. `kwebui/__init__.py`
+# already reads the version via `importlib.metadata.version("kwebui")`,
+# which is populated from whatever setuptools_scm computed at
+# build/install time -- no runtime dependency on setuptools_scm itself,
+# and no code change needed there.
+fallback_version = "0.0.0"
+# "guess-next-dev" (setuptools_scm's own default) assumes the next
+# release will be a patch bump and reports e.g. 0.11.1.dev1 for a commit
+# past v0.11.0 -- confusing since no 0.11.1 work is actually in
+# progress. "no-guess-dev" instead stays anchored to the actual last
+# tag (0.11.0.post1.dev1+... instead of 0.11.1.dev1+...), only turning
+# into a clean "0.11.0" once a build happens exactly at that tagged
+# commit with no uncommitted changes.
+version_scheme = "no-guess-dev"
 
 [tool.setuptools.packages.find]
 include = ["kwebui*"]
