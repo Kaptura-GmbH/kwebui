@@ -13,6 +13,13 @@ Two ways to feed frames:
     be changed live with ``widget.set_fps(...)`` -- no restart needed --
     and ``fps=None``/``0`` means unthrottled: poll as fast as
     ``frame_provider`` itself can produce frames.
+
+``fps`` is a *capture* rate. ``max_send_fps`` is separate, and caps what
+each viewer is actually sent -- useful when the provider is deliberately
+fast (a camera grabbing at 200 fps) but a browser cannot paint more than
+its display refreshes anyway. Frames in between are dropped rather than
+queued, so a slow viewer stays on the newest frame instead of falling
+progressively behind. See ``_mjpeg_chunks``.
 """
 
 from __future__ import annotations
@@ -55,6 +62,13 @@ class ImageStreamWidget(Widget):
         """Change the pull-model poll rate. Takes effect on the next frame,
         no restart needed. ``None`` or <= 0 means unthrottled (max speed)."""
         self.update(fps=fps)
+        return self
+
+    def set_max_send_fps(self, max_send_fps: float | None) -> "ImageStreamWidget":
+        """Cap how many frames per second are sent to each viewer, without
+        touching how fast ``frame_provider`` is polled. ``None`` or <= 0
+        means no cap (send every frame). Takes effect on the next frame."""
+        self.update(max_send_fps=max_send_fps)
         return self
 
     def set_width(self, width: float) -> "ImageStreamWidget":
@@ -111,10 +125,33 @@ class ImageStreamWidget(Widget):
 
 
 async def _mjpeg_chunks(widget: ImageStreamWidget) -> AsyncIterator[bytes]:
+    loop = asyncio.get_running_loop()
+    last_sent = float("-inf")
     while True:
         await widget._frame_ready.wait()
+
+        # Throttle what goes down the wire, independently of how fast
+        # frames are produced. Capturing at 200 fps can be entirely
+        # reasonable (that is the provider's business), but *sending* at
+        # 200 fps to a browser is not: measured, Chromium paints at most
+        # ~60/s no matter how many frames it is fed, and Firefox does far
+        # worse -- at 100 fps of 1440x1080 JPEG its main thread already
+        # stalls for seconds at a time, and at 200 fps the page stops
+        # responding altogether, because it accepts every frame off the
+        # socket and queues them faster than it can decode them.
+        max_fps = widget.props.get("max_send_fps")
+        if max_fps:
+            remaining = (1 / max_fps) - (loop.time() - last_sent)
+            if remaining > 0:
+                await asyncio.sleep(remaining)
+
+        # Read the frame *after* any wait, never before: the point of
+        # skipping frames is to show the newest one, so a viewer that
+        # cannot keep up falls behind by nothing rather than working
+        # through a backlog.
         frame = widget._latest_frame
         if frame is not None:
+            last_sent = loop.time()
             yield _BOUNDARY + b"\r\nContent-Type: image/jpeg\r\nContent-Length: " + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n"
 
 
@@ -127,6 +164,9 @@ class ImageStreamPlugin(WidgetPlugin):
     Example (pull model, kwebui polls for you):
         stream = app.imagestream(frame_provider=capture_jpeg_from_camera, fps=15)
         stream.set_fps(0)   # switch to unthrottled (max speed) at any time
+
+    Example (grab fast, but do not flood the browser):
+        stream = app.imagestream(frame_provider=grab, fps=200, max_send_fps=60)
     """
 
     widget_name = "imagestream"
@@ -137,10 +177,17 @@ class ImageStreamPlugin(WidgetPlugin):
         *,
         frame_provider: Callable[[], bytes] | None = None,
         fps: float | None = 10,
+        max_send_fps: float | None = None,
         width: float = -1,
         stretch: bool = False,
     ) -> ImageStreamWidget:
-        props = {"fps": fps, "frame_provider": frame_provider, "width": width, "stretch": stretch}
+        props = {
+            "fps": fps,
+            "max_send_fps": max_send_fps,
+            "frame_provider": frame_provider,
+            "width": width,
+            "stretch": stretch,
+        }
         return ImageStreamWidget(widget_id, self.widget_name, props)
 
     def register_routes(self, fastapi_app: "FastAPI", app: "KApp") -> None:

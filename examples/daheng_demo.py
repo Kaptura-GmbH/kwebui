@@ -105,7 +105,16 @@ class DahengDemo(KApp):
             "Start / Reconnect camera", on_click=lambda: self.on_start_button()
         )
 
-        self.stream = self.imagestream(frame_provider=self._next_frame, fps=40 )
+        # fps is the *capture* rate (what the camera is asked for, and what
+        # the FPS field below changes); max_send_fps caps what is actually
+        # sent to the browser. Measured: a browser paints at most its
+        # display refresh rate no matter how many frames it is fed, so
+        # anything above ~60 is pure waste -- and in Firefox it is worse
+        # than waste, since it queues every frame it cannot decode in time
+        # and the page stalls for seconds (at 200 fps it stops responding
+        # altogether). Raising the FPS field is therefore safe now: it
+        # still grabs faster, it just does not flood the viewer.
+        self.stream = self.imagestream(frame_provider=self._next_frame, fps=40, max_send_fps=60)
 
         self.fps_edit = self.textedit(
             "Stream FPS (0 = max speed)", placeholder="40", on_change=self.on_fps_change
@@ -392,4 +401,4 @@ class DahengDemo(KApp):
 
 
 if __name__ == "__main__":
-    DahengDemo(title="Daheng Camera Viewer").run()
+    DahengDemo(title="Daheng Camera Viewer", single_session=True).run()

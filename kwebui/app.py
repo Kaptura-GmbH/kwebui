@@ -17,6 +17,7 @@ import itertools
 import re
 import socket
 import traceback
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -85,12 +86,42 @@ class KApp:
     available space the same way regardless of this cap (see `docs/architecture.md`).
     """
 
-    def __init__(self, title: str = "kwebui app", width: float | None = None) -> None:
+    def __init__(
+        self,
+        title: str = "kwebui app",
+        width: float | None = None,
+        single_session: bool = True,
+    ) -> None:
+        """``single_session=True`` makes the newest browser tab the only
+        live one: whenever a tab connects, every already-connected tab is
+        disconnected and shows a "superseded" badge instead of silently
+        continuing to mirror the same app (see ``websocket.py``).
+
+        Off by default, because kwebui's session model is deliberately
+        multi-viewer -- one shared widget tree broadcast to every
+        connected browser, so the same app can be open on a second
+        monitor or another machine. Turn it on for an app where two live
+        views would be confusing or unsafe (e.g. one that drives
+        hardware), or simply to stop leftover tabs from earlier runs
+        piling up as live views of the current one."""
         self.title = title
         self.width = width
+        self.single_session = single_session
         self.page = Page()
         self.registry = WidgetRegistry().discover()
         self.theme = DEFAULT_THEME
+        # Identifies this *process*, not this app: sent with every "init"
+        # so a browser tab can tell "the server I was rendered against"
+        # from "a different server that happens to be on the same port".
+        # Killing an app and starting it again leaves the old tabs open,
+        # and SO_REUSEADDR (see _bind_free_port) means the new run
+        # usually claims the very same port -- so those tabs silently
+        # reconnect and come back to life against the new process,
+        # half-broken (measured: they become fully interactive again, yet
+        # an imagestream in them never re-requests /stream/ and stays
+        # frozen forever). A changed run_id lets the tab notice and
+        # reload itself instead. See websocket.js.
+        self.run_id = uuid.uuid4().hex
         self._custom_themes: dict[str, Path] = {}
         self._sessions: list[Session] = []
         self._loop: asyncio.AbstractEventLoop | None = None

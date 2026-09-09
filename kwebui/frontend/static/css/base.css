@@ -462,6 +462,40 @@ body.sg-has-sidebar.sg-sidebar-collapsed {
    text+border instead of a banner background, per this codebase's
    convention of one consistent status-color set across alert/toast/
    popup/highlight/workflow_tracker. */
+/* Connection-lost badge (index.html + websocket.js). Fixed top-right and
+   above even toasts (z-index 1000), since "the server is gone" outranks
+   anything the page itself has to say -- and in practice nothing else can
+   arrive while it's showing, because everything else comes over the very
+   connection that just died. Uses the same error red as the rest of the
+   status colors below. */
+#connection-status {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2000;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #dc2626;
+  background: var(--sg-bg);
+  color: #dc2626;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* A tab that was superseded by a newer one (KApp(single_session=True),
+   see websocket.js) is dead for good -- only a reload brings it back --
+   so the whole page is dimmed and made unclickable. #connection-status
+   is deliberately outside #app-root/#topbar-root so the badge saying why
+   stays fully readable and is itself unaffected. */
+body.sg-superseded #app-root,
+body.sg-superseded #topbar-root {
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+
 .sg-badge-success { background: rgba(22, 163, 74, 0.12); border-color: #16a34a; color: #16a34a; }
 .sg-badge-info { background: rgba(37, 99, 235, 0.12); border-color: #2563eb; color: #2563eb; }
 .sg-badge-warning { background: rgba(217, 119, 6, 0.12); border-color: #d97706; color: #d97706; }

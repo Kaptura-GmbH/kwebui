@@ -182,6 +182,26 @@ a lot of machinery for a library meant to be readable in an afternoon.
 `Session` is still its own class, so per-session isolation could be
 added later without breaking the API.
 
+If you'd rather only *one* tab be live at a time, pass
+`single_session=True` to the `KApp` constructor:
+
+```python
+MyApp(title="My App", single_session=True).run()
+```
+
+Then whenever a tab connects, every already-connected tab is
+disconnected and shows a badge reading "Disconnected — opened in another
+tab. Reload to use it here." (reloading that tab claims the app back,
+superseding whichever tab currently holds it). Off by default, since the
+shared-tree behaviour above is the intended model; turn it on for an app
+where two simultaneous live views would be confusing or unsafe — one
+driving hardware, say — or simply to stop leftover tabs from earlier runs
+acting as live views of the current one.
+
+A superseded tab deliberately does **not** try to reconnect. If it did,
+it would immediately supersede the newer tab, whose own retry would
+supersede it back, once a second, forever.
+
 ## 4. Widget catalog
 
 Every widget is called as `self.<name>(...)` inside `build()` (or on a

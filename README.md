@@ -262,6 +262,15 @@ added later without an API break — see
 [`docs/architecture.md`](docs/architecture.md#5-sessions) for the
 reasoning in full.
 
+If you want only one live tab at a time, opt in with
+`KApp(single_session=True)`. Every time a tab connects, the previously
+connected ones are disconnected and show a "Disconnected — opened in
+another tab" badge; reloading such a tab claims the app back. Useful for
+an app where two simultaneous live views would be confusing or unsafe
+(one driving hardware, say), or to stop leftover tabs from earlier runs
+acting as live views of the current one. Off by default — the shared
+broadcast model above is the intended one.
+
 ## Contributing
 
 Issues and pull requests are welcome. Before opening a PR:
