@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import inspect
 import itertools
 import re
 import socket
 import traceback
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from .page import Page
 from .registry import WidgetRegistry
@@ -92,18 +93,17 @@ class KApp:
         width: float | None = None,
         single_session: bool = True,
     ) -> None:
-        """``single_session=True`` makes the newest browser tab the only
-        live one: whenever a tab connects, every already-connected tab is
-        disconnected and shows a "superseded" badge instead of silently
-        continuing to mirror the same app (see ``websocket.py``).
+        """``single_session=True`` (the default) makes the newest browser
+        tab the only live one: whenever a tab connects, every
+        already-connected tab is disconnected and shows a "superseded"
+        badge instead of silently continuing to mirror the same app (see
+        ``websocket.py``). This also keeps a leftover tab from an earlier
+        run of the app from piling up as a live view of the current one.
 
-        Off by default, because kwebui's session model is deliberately
-        multi-viewer -- one shared widget tree broadcast to every
-        connected browser, so the same app can be open on a second
-        monitor or another machine. Turn it on for an app where two live
-        views would be confusing or unsafe (e.g. one that drives
-        hardware), or simply to stop leftover tabs from earlier runs
-        piling up as live views of the current one."""
+        Pass ``single_session=False`` to opt back into kwebui's other
+        session model -- one shared widget tree broadcast to every
+        connected browser -- for an app that is meant to be open on a
+        second monitor or another machine at the same time."""
         self.title = title
         self.width = width
         self.single_session = single_session
@@ -126,6 +126,12 @@ class KApp:
         self._sessions: list[Session] = []
         self._loop: asyncio.AbstractEventLoop | None = None
         self._id_counter = itertools.count(1)
+        # Set once run() actually starts serving (see the lifespan hook in
+        # router.py) -- exit() needs it to tell uvicorn to stop; it stays
+        # None for an app that is never run() (e.g. under test), which is
+        # exactly when exit()/on_shutdown() should be harmless no-ops.
+        self._server: Any = None
+        self._shutdown_callbacks: list[Callable[[], Any]] = []
         self.build()
 
     def build(self) -> None:
@@ -274,6 +280,70 @@ class KApp:
         except Exception:
             self._remove_session(session)
 
+    # -- graceful shutdown ----------------------------------------------------
+
+    def on_shutdown(self, callback: Callable[[], Any | Awaitable[Any]]) -> None:
+        """Register a cleanup callback for graceful shutdown -- e.g.
+        releasing a camera or other hardware handle before the process
+        exits. Runs once, whether the app stops via ``exit()``, Ctrl+C, or
+        SIGTERM (uvicorn already turns both of those into the same
+        graceful stop, and this hooks into that same path -- see
+        ``router.py``'s lifespan).
+
+        ``callback`` takes no arguments and may be a plain sync function
+        or an async one. Multiple callbacks run in registration order; an
+        exception in one is printed (like a widget callback's) and does
+        not stop the rest from running.
+        """
+        self._shutdown_callbacks.append(callback)
+
+    async def _run_shutdown_callbacks(self) -> None:
+        for callback in self._shutdown_callbacks:
+            try:
+                result = callback()
+                if inspect.isawaitable(result):
+                    await result
+            except Exception:
+                traceback.print_exc()
+
+    def exit(self) -> None:
+        """Gracefully stop the running app -- from anywhere: a widget
+        callback (e.g. a "Quit" button), a background thread, a timer,
+        ... . Tells every connected browser the app is stopping on
+        purpose (a distinct, non-retrying badge -- see websocket.js),
+        runs any ``on_shutdown()`` callbacks, and stops uvicorn the same
+        clean way as Ctrl+C: in-flight requests finish, then ``run()``
+        returns.
+
+        A no-op if the app was never started with ``run()`` (or has
+        already stopped) -- there is nothing to gracefully stop yet."""
+        if self._loop is None:
+            return
+        asyncio.run_coroutine_threadsafe(self._graceful_shutdown(), self._loop)
+
+    async def _graceful_shutdown(self) -> None:
+        from .websocket import SHUTDOWN_CLOSE_CODE, _close_all_sessions
+
+        _close_all_sessions(self, SHUTDOWN_CLOSE_CODE)
+        # _close_all_sessions only *signals* each session's own task to
+        # close itself with our distinctive code (see Session.request_close
+        # for why it can't just close them directly) -- give the event
+        # loop a turn so those tasks actually get to act on it and send
+        # that code, before should_exit below starts uvicorn's own
+        # shutdown (which would otherwise race to close the same sockets
+        # first, with a generic code the frontend can't distinguish from
+        # an ordinary drop, showing "reconnecting..." against a server
+        # that isn't coming back instead of "the app has stopped").
+        await asyncio.sleep(0.05)
+        # should_exit is polled by uvicorn's own serve loop -- setting it
+        # is what makes run() return, the same mechanism Ctrl+C/SIGTERM
+        # already use (see uvicorn.Server.install_signal_handlers). The
+        # on_shutdown callbacks themselves run from router.py's lifespan
+        # (which fires on *any* graceful stop, not just this one), not
+        # here, so Ctrl+C/SIGTERM get them too.
+        if self._server is not None:
+            self._server.should_exit = True
+
     # -- serving --------------------------------------------------------------
 
     def run(self, host: str = "127.0.0.1", port: int = 8701, *, log_level: str = "info") -> None:
@@ -299,4 +369,8 @@ class KApp:
         # ourselves instead, since that's the one line that actually
         # matters for finding the app.
         print(f"kwebui app running on http://{host}:{bound_port} (Press CTRL+C to quit)", flush=True)
-        uvicorn.Server(config).run(sockets=[sock])
+        # Kept on self so exit() can reach it (should_exit=True) from
+        # anywhere -- a widget callback, another thread, ... -- long after
+        # this call has started blocking.
+        self._server = uvicorn.Server(config)
+        self._server.run(sockets=[sock])

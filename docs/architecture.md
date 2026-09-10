@@ -100,6 +100,23 @@ this codebase) is only set while an event is being dispatched, so a
 callback can read `app.session.state` but code outside a callback sees
 `None`.
 
+`single_session=True` (the default) layers "only the newest tab stays
+connected" on top of the shared tree: `websocket.py`'s
+`websocket_endpoint` still speaks to every connection the same way, but
+a fresh connection makes every previous `Session` request its own
+close. It *requests* rather than closes directly on purpose --
+`Session.request_close()`'s docstring has the full reasoning, but in
+short: Starlette's `WebSocket` assumes a single task owns both sending
+and receiving on a connection, so calling `.close()` on one from a
+*different* task (the new connection's) races that connection's own
+`receive_json()` loop and can surface as a raw `RuntimeError` instead of
+a clean disconnect. Each session's own task instead races
+`receive_json()` against a `wait_for_close()` signal (`asyncio.wait`,
+`FIRST_COMPLETED`) and closes its own socket itself the moment that
+signal fires -- the only thing another task ever does is set it.
+`KApp.exit()` reuses the identical mechanism (a different close code) to
+tell every connection to stop, whether or not `single_session` is on.
+
 ## 6. Themes
 
 Themes are just CSS files in `kwebui/themes/*.css`, each defining the

@@ -28,6 +28,7 @@ class Example1:
         container.text("Example 1", size=24, bold=True)
         container.text("A plain text-and-button page.", color="#6b7280")
         container.button("Say hi", on_click=self.on_button_click)
+        
 
     def on_button_click(self) -> None:
         print("hi from example 1")
@@ -58,6 +59,7 @@ class Workflow(KApp):
         sidebar.text("Workflow", size=18, bold=True)
         # sidebar.text("Pick a step in the topbar above to switch pages.", color="#6b7280")
         self.tracker = sidebar.workflow_tracker(list(TASKS), on_select=self.show_task,orientation="vertical")
+        self.button("Exit", on_click=self.exit)
 
         # The container is the "rest of the page" -- everything except
         # the topbar and the sidebar -- and its whole content gets

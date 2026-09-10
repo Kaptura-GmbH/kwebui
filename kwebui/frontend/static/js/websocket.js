@@ -8,10 +8,13 @@
 // (see KApp.run_id). Null until the first "init" arrives.
 let knownRunId = null;
 
-// Must match SUPERSEDED_CLOSE_CODE in websocket.py: this tab was
-// deliberately replaced by a newer one (KApp(single_session=True)), as
-// opposed to having lost the server.
+// Must match the close codes of the same name in websocket.py: this tab
+// was deliberately, permanently disconnected on purpose -- either
+// replaced by a newer one (KApp(single_session=True)) or the app
+// stopping via KApp.exit()/Ctrl+C/SIGTERM -- as opposed to having lost
+// the server (an ordinary close, which does keep retrying).
 const SUPERSEDED_CLOSE_CODE = 4001;
+const SHUTDOWN_CLOSE_CODE = 4002;
 
 // Direct DOM, deliberately outside Vue's render tree -- same reasoning as
 // the theme stylesheet swap below: this has to keep working regardless of
@@ -29,23 +32,25 @@ function hideDisconnected() {
   if (badge) badge.hidden = true;
 }
 
-// This tab was replaced by a newer one and is never coming back (only
-// a reload can claim the app again), so leave it genuinely inert rather
-// than merely badged: the badge alone still leaves a page that looks
-// clickable, and -- more importantly -- an imagestream's <img> would go
-// on pulling MJPEG frames over its own HTTP connection, which the closed
-// WebSocket does nothing to stop.
-function markSuperseded() {
+// This tab is never coming back on its own -- either a newer tab
+// replaced it (only a reload can claim the app back), or the app itself
+// stopped (nothing to reload back to) -- so leave it genuinely inert
+// rather than merely badged: the badge alone still leaves a page that
+// looks clickable, and -- more importantly -- an imagestream's <img>
+// would go on pulling MJPEG frames over its own HTTP connection, which
+// the closed WebSocket does nothing to stop.
+function markTerminal(message) {
+  showDisconnected(message);
   // Widgets that hold a live resource watch this and release it -- see
   // imagestream.js, which freezes on its last frame and drops the stream.
-  state.superseded = true;
+  state.terminated = true;
   // Nothing can be delivered any more, so make outgoing events a no-op
   // instead of letting them throw on the closed socket.
   sendEvent = () => {};
   // Visual + interaction cue, applied here rather than through Vue for
   // the same reason as the badge: it has to hold regardless of what the
   // widget tree does.
-  document.body.classList.add("sg-superseded");
+  document.body.classList.add("sg-terminated");
 }
 
 function connect() {
@@ -94,8 +99,15 @@ function connect() {
       // whose own retry would then supersede this one -- an endless
       // once-a-second tug of war between two tabs. Reloading is the
       // user's explicit way to claim the app back.
-      showDisconnected("Disconnected — opened in another tab. Reload to use it here.");
-      markSuperseded();
+      markTerminal("Disconnected — opened in another tab. Reload to use it here.");
+      return;
+    }
+    if (event.code === SHUTDOWN_CLOSE_CODE) {
+      // Also deliberately terminal, for a different reason: the process
+      // itself is gone (KApp.exit() / Ctrl+C / SIGTERM), so retrying
+      // would just be a silent, endless loop of connection-refused
+      // errors against a server that isn't coming back.
+      markTerminal("Disconnected — the app has stopped.");
       return;
     }
     showDisconnected("Disconnected — reconnecting…");

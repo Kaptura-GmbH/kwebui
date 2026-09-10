@@ -27,7 +27,14 @@ def build_fastapi_app(app: "KApp") -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         app._loop = asyncio.get_running_loop()
-        yield
+        try:
+            yield
+        finally:
+            # Fires on *any* graceful stop -- Ctrl+C, SIGTERM, or
+            # KApp.exit() (which works by asking uvicorn to stop the same
+            # way) -- so on_shutdown() callbacks run exactly once
+            # regardless of which of those triggered it.
+            await app._run_shutdown_callbacks()
 
     fastapi_app = FastAPI(title=app.title, lifespan=lifespan)
     fastapi_app.state.kwebui_app = app

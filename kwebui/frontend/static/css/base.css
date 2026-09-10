@@ -484,13 +484,14 @@ body.sg-has-sidebar.sg-sidebar-collapsed {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
-/* A tab that was superseded by a newer one (KApp(single_session=True),
-   see websocket.js) is dead for good -- only a reload brings it back --
-   so the whole page is dimmed and made unclickable. #connection-status
-   is deliberately outside #app-root/#topbar-root so the badge saying why
-   stays fully readable and is itself unaffected. */
-body.sg-superseded #app-root,
-body.sg-superseded #topbar-root {
+/* A tab that was permanently disconnected -- superseded by a newer one
+   (KApp(single_session=True), the default) or the app itself stopping
+   (KApp.exit()/Ctrl+C/SIGTERM) -- is dead for good (see websocket.js's
+   markTerminal()), so the whole page is dimmed and made unclickable.
+   #connection-status is deliberately outside #app-root/#topbar-root so
+   the badge saying why stays fully readable and is itself unaffected. */
+body.sg-terminated #app-root,
+body.sg-terminated #topbar-root {
   opacity: 0.45;
   pointer-events: none;
   user-select: none;

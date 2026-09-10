@@ -182,25 +182,34 @@ a lot of machinery for a library meant to be readable in an afternoon.
 `Session` is still its own class, so per-session isolation could be
 added later without breaking the API.
 
-If you'd rather only *one* tab be live at a time, pass
-`single_session=True` to the `KApp` constructor:
-
-```python
-MyApp(title="My App", single_session=True).run()
-```
-
-Then whenever a tab connects, every already-connected tab is
-disconnected and shows a badge reading "Disconnected — opened in another
-tab. Reload to use it here." (reloading that tab claims the app back,
-superseding whichever tab currently holds it). Off by default, since the
-shared-tree behaviour above is the intended model; turn it on for an app
-where two simultaneous live views would be confusing or unsafe — one
-driving hardware, say — or simply to stop leftover tabs from earlier runs
-acting as live views of the current one.
+On top of that shared tree, kwebui also decides, by default, that only
+**one** browser tab gets to be live at a time —
+`single_session=True` is the default. Whenever a tab connects, every
+already-connected tab is disconnected and shows a badge reading
+"Disconnected — opened in another tab. Reload to use it here." (reloading
+that tab claims the app back, superseding whichever tab currently holds
+it). This is what you want for the common case of a tool driving one
+piece of hardware or one workflow: no confusing split-brain state between
+two live views, and no leftover tab from an earlier run silently coming
+back to life as a second "live" view when you restart the app. It also
+applies to anything a widget holds a live connection to on its own —
+an `imagestream`'s MJPEG feed, say — which is severed on the *server*
+side the moment a tab is superseded, not left to the superseded tab's own
+(possibly busy) browser tab to notice and disconnect.
 
 A superseded tab deliberately does **not** try to reconnect. If it did,
 it would immediately supersede the newer tab, whose own retry would
 supersede it back, once a second, forever.
+
+Pass `single_session=False` to opt back into the shared-broadcast model
+instead — the same widget tree, live on every connected browser at once:
+
+```python
+MyApp(title="My App", single_session=False).run()
+```
+
+Do this for an app that's meant to be open on a second monitor or another
+machine at the same time.
 
 ## 4. Widget catalog
 
@@ -231,7 +240,7 @@ Quick reference, then a screenshot for each one below:
 | [ProgressBar](#progressbar) | `self.progressbar(50)` / `self.progressbar(0, indeterminate=True)` |
 | [Spinner](#spinner) | `with self.spinner("Working...", show_time=True): do_slow_thing()` |
 | [Image](#image) | `self.image("cat.jpg", width=-1, stretch=False)` |
-| [ImageStream](#imagestream) | `self.imagestream(frame_provider=capture_jpeg, fps=15, width=-1, stretch=False)` |
+| [ImageStream](#imagestream) | `self.imagestream(frame_provider=capture_jpeg, fps=15, max_send_fps=None, width=-1, stretch=False)` |
 | [FileUploader](#fileuploader) | `self.file_uploader("Upload a CSV", accept=".csv", on_upload=lambda filename, data: ...)` |
 | [Html](#html) | `self.html("<strong>Raw HTML</strong>")` |
 | [Json](#json) | `self.json({"status": "ok", "items": [1, 2, 3]})` |
@@ -400,6 +409,24 @@ over `width`); change either later with `stream.set_width(...)` /
 `stream.set_stretch(...)`. See
 `examples/mjpeg_demo.py` and `examples/daheng_demo.py` for real
 camera-backed uses.
+
+`fps` is a *capture* rate, not a delivery guarantee — a separate
+`max_send_fps` caps what's actually sent to each viewer:
+
+```python
+self.imagestream(frame_provider=grab_from_fast_camera, fps=200, max_send_fps=60)
+```
+
+Useful whenever the provider can genuinely produce frames faster than a
+browser can paint them — a browser only ever repaints at its own display
+refresh rate no matter how many frames you feed it, and pushing far more
+than that wastes bandwidth for nothing. Worse than wasted, in practice:
+overloading the browser's decode pipeline this way can leave the page's
+own JavaScript with too little of the main thread to run *at all* for
+seconds at a time. `max_send_fps=None` (the default) sends every
+captured frame; frames produced faster than the cap are dropped rather
+than queued, so a slow viewer always sees the newest frame instead of
+gradually falling behind. Change it live with `stream.set_max_send_fps(...)`.
 
 ![ImageStream widget showing a synthetic live feed](images/widget-imagestream.png)
 
@@ -987,6 +1014,37 @@ every theme, rather than redefined per theme file. Override them in your
 own stylesheet to change the default everywhere, or redefine them inside
 a specific `themes/<name>.css` if you want that one theme to have its
 own button color or container padding.
+
+## 9. Stopping the app gracefully
+
+`Ctrl+C` (or a `SIGTERM`, e.g. from a process manager) already stops the
+app cleanly on its own — uvicorn finishes in-flight requests, then
+`run()` returns. Two more pieces let your own code join in:
+
+```python
+class CameraApp(KApp):
+    def build(self) -> None:
+        self.on_shutdown(self.release_camera)
+        self.button("Quit", on_click=self.exit)
+
+    def release_camera(self) -> None:
+        self.camera.close_device()
+```
+
+`on_shutdown(callback)` registers cleanup to run once, on *any* graceful
+stop — `Ctrl+C`, `SIGTERM`, or `exit()` below, all the same code path —
+so a camera or other hardware handle gets released regardless of which
+of the three actually happened. `callback` takes no arguments and may be
+a plain sync function or an async one; register as many as you like,
+they run in order, and one raising doesn't stop the rest from running
+(printed, not swallowed, same as an uncaught callback error elsewhere).
+
+`exit()` triggers that same graceful stop from inside the running app —
+a "Quit" button as above, a background thread, a timer, whatever your
+app needs. Callable from anywhere; every connected browser is told the
+app is stopping on purpose (a "Disconnected — the app has stopped."
+badge that, unlike an ordinary disconnect, does not keep retrying against
+a process that isn't coming back) before `run()` returns.
 
 ## Where to go next
 

@@ -124,6 +124,11 @@ with a real screenshot for every widget. The short version:
 4. Advanced: inside a callback, `self.session` gives you the connection
    that triggered it (`self.session.state` is a free scratchpad dict).
    Most apps never need this.
+5. `self.on_shutdown(callback)` registers cleanup (e.g. releasing a
+   camera) that runs once on any graceful stop — `Ctrl+C`, `SIGTERM`, or
+   `self.exit()`, which triggers that same stop from inside the app
+   itself (a "Quit" button, a background thread, ...) — see
+   [`docs/user-guide.md`](docs/user-guide.md#9-stopping-the-app-gracefully).
 
 ## Widgets
 
@@ -142,7 +147,7 @@ every widget, plus the install-and-run walkthrough in more depth — see
 | ProgressBar | `self.progressbar(50)` / `self.progressbar(0, indeterminate=True)` |
 | Spinner | `with self.spinner("Working...", show_time=True): do_slow_thing()` |
 | Image | `self.image("cat.jpg", width=150)` / `self.image("cat.jpg", stretch=True)` — `width` (-1/0 = natural size, default) resizes the viewer; `stretch=True` fills the parent container's width instead. Local paths and URLs both work |
-| ImageStream | `self.imagestream(frame_provider=capture_jpeg, fps=15)` — live MJPEG feed (webcam/OpenCV); or call `stream.push_frame(jpeg_bytes)` yourself. Same `width`/`stretch` as Image. `stream.latest_frame()` returns the most recent JPEG bytes (see `examples/mjpeg_demo.py` for a snapshot-capture button) |
+| ImageStream | `self.imagestream(frame_provider=capture_jpeg, fps=15, max_send_fps=None)` — live MJPEG feed (webcam/OpenCV); or call `stream.push_frame(jpeg_bytes)` yourself. Same `width`/`stretch` as Image. `fps` is the capture rate; `max_send_fps` separately caps what's sent to each viewer — useful when the provider is faster than a browser can paint, since feeding it more than that wastes bandwidth and can even leave the page's own JS starved of the main thread. `stream.latest_frame()` returns the most recent JPEG bytes (see `examples/mjpeg_demo.py` for a snapshot-capture button) |
 | FileUploader | `self.file_uploader("Upload a file", accept=".csv", on_upload=lambda filename, data: ...)` — needs the `[file_uploader]` extra installed; without it, uploads return a clear error instead of failing |
 | Html | `self.html("<strong>Raw HTML</strong>")` — trusts the string, don't pass unsanitized user input |
 | Json | `self.json({"status": "ok", "items": [1, 2, 3]})` — pretty-printed, read-only |
@@ -262,14 +267,16 @@ added later without an API break — see
 [`docs/architecture.md`](docs/architecture.md#5-sessions) for the
 reasoning in full.
 
-If you want only one live tab at a time, opt in with
-`KApp(single_session=True)`. Every time a tab connects, the previously
-connected ones are disconnected and show a "Disconnected — opened in
-another tab" badge; reloading such a tab claims the app back. Useful for
-an app where two simultaneous live views would be confusing or unsafe
-(one driving hardware, say), or to stop leftover tabs from earlier runs
-acting as live views of the current one. Off by default — the shared
-broadcast model above is the intended one.
+On top of the shared tree above, kwebui also defaults to keeping only
+**one** live tab at a time (`single_session=True`, the default). Every
+time a tab connects, the previously connected ones are disconnected and
+show a "Disconnected — opened in another tab" badge; reloading such a
+tab claims the app back. This is what you want for the common case of a
+tool driving one piece of hardware or one workflow — no leftover tab
+from an earlier run silently coming back to life as a second "live" view
+when you restart the app. Pass `KApp(single_session=False)` to opt back
+into the plain shared-broadcast model instead, for an app meant to be
+open on a second monitor or another machine at the same time.
 
 ## Contributing
 

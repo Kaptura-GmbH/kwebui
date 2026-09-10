@@ -8,14 +8,16 @@
 // response to "init"/"update" messages; Vue's reactivity re-renders
 // whatever changed. Nothing here builds or patches DOM directly -- that's
 // entirely Vue's job now, driven by WidgetNode in renderer.js.
-// `superseded` is set once, terminally, when the server closes this tab's
-// connection because a newer one replaced it (KApp(single_session=True) --
-// see websocket.js). Part of the reactive state rather than a plain flag
-// so widgets holding a live resource can react to it: an imagestream's
-// <img> keeps its own open HTTP connection to /stream/, entirely
-// independent of the WebSocket, so closing the socket does not stop it
-// pulling frames -- only the widget dropping that <img> does.
-const state = Vue.reactive({ widgets: [], superseded: false });
+// `terminated` is set once, permanently, when the server deliberately
+// closes this tab's connection for good -- a newer tab replaced it
+// (KApp(single_session=True), the default) or the app itself stopped
+// (KApp.exit()/Ctrl+C/SIGTERM) -- see websocket.js's markTerminal().
+// Part of the reactive state rather than a plain flag so widgets holding
+// a live resource can react to it: an imagestream's <img> keeps its own
+// open HTTP connection to /stream/, entirely independent of the
+// WebSocket, so closing the socket does not stop it pulling frames --
+// only the widget dropping that <img> does.
+const state = Vue.reactive({ widgets: [], terminated: false });
 
 /** Find a widget by id anywhere in the tree (top-level or nested inside
  * children) and merge new data onto it in place, so Vue's reactivity

@@ -230,7 +230,7 @@ class ImageStreamPlugin(WidgetPlugin):
             cancel: asyncio.Event | None = None
             if app.single_session:
                 # The same "newest tab wins" policy already applied to the
-                # WebSocket (see websocket.py's _supersede_existing_sessions),
+                # WebSocket (see websocket.py's _close_all_sessions),
                 # applied independently here: in single_session mode at
                 # most one browser is ever entitled to a given imagestream,
                 # so a fresh connection for the same widget can only mean a

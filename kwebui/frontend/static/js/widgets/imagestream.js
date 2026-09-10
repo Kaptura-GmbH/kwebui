@@ -29,22 +29,22 @@ registerWidget("imagestream", {
     // Read through a computed rather than referenced directly in the
     // template: Vue only resolves component properties there, not plain
     // module globals like core.js's `state`.
-    superseded() {
-      return state.superseded;
+    terminated() {
+      return state.terminated;
     },
   },
   watch: {
-    superseded(isSuperseded) {
-      if (isSuperseded) this.freeze();
+    terminated(isTerminated) {
+      if (isTerminated) this.freeze();
     },
   },
-  // A tab can be superseded before this widget ever mounts (it is created
+  // A tab can be terminated before this widget ever mounts (it is created
   // fresh from a later "update" message), in which case the watcher never
   // fires -- so check on mount too, or such a widget would open a stream
   // connection the tab is no longer entitled to.
   mounted() {
     document.addEventListener("visibilitychange", this.onVisibilityChange);
-    if (state.superseded) this.freeze();
+    if (state.terminated) this.freeze();
     else this.onVisibilityChange();
   },
   unmounted() {
@@ -67,15 +67,15 @@ registerWidget("imagestream", {
       if (document.visibilityState === "hidden") this.freeze();
       else this.thaw();
     },
-    // Back to live frames. Superseded is deliberately excluded: that tab
+    // Back to live frames. A terminated tab is deliberately excluded: it
     // is dead for good, no matter how often it is looked at.
     thaw() {
-      if (state.superseded) return;
+      if (state.terminated) return;
       this.frozenSrc = null;
     },
     // Stop pulling frames. The <img> holds its own long-lived HTTP
     // connection to /stream/, completely separate from the WebSocket, so
-    // a superseded tab goes on consuming camera frames and one of the
+    // a terminated tab goes on consuming camera frames and one of the
     // browser's few per-origin connection slots until something changes
     // this src. Snapshot the last decoded frame into a data URL first, so
     // what the user is left looking at is the picture that was there --
