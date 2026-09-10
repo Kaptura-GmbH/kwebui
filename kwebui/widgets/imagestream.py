@@ -124,11 +124,33 @@ class ImageStreamWidget(Widget):
                 await asyncio.sleep(remaining)
 
 
-async def _mjpeg_chunks(widget: ImageStreamWidget) -> AsyncIterator[bytes]:
+async def _mjpeg_chunks(
+    widget: ImageStreamWidget, cancel: asyncio.Event | None = None
+) -> AsyncIterator[bytes]:
     loop = asyncio.get_running_loop()
     last_sent = float("-inf")
     while True:
-        await widget._frame_ready.wait()
+        if cancel is not None and cancel.is_set():
+            # Severed from the server side (see register_routes) -- this
+            # must never depend on the *client's* JS running, because the
+            # one thing that can make a browser's main thread too busy to
+            # ever run that JS is this very connection: measured, a
+            # sufficiently fast/large MJPEG feed pegs Firefox's main
+            # thread hard enough that literally no script executes again,
+            # not even a bare property write -- so the client can never be
+            # the one to hang up. Ending the generator here closes the
+            # StreamingResponse and the underlying TCP connection
+            # regardless of what the browser is doing.
+            return
+        if cancel is not None:
+            # Re-check `cancel` periodically even with no new frame, so a
+            # provider that stalls doesn't also stall the teardown.
+            try:
+                await asyncio.wait_for(widget._frame_ready.wait(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+        else:
+            await widget._frame_ready.wait()
 
         # Throttle what goes down the wire, independently of how fast
         # frames are produced. Capturing at 200 fps can be entirely
@@ -191,13 +213,55 @@ class ImageStreamPlugin(WidgetPlugin):
         return ImageStreamWidget(widget_id, self.widget_name, props)
 
     def register_routes(self, fastapi_app: "FastAPI", app: "KApp") -> None:
+        # widget_id -> the cancel signal for whichever /stream/ connection
+        # is currently considered "the" viewer of that widget, only ever
+        # populated in single_session mode (see below). One dict per KApp
+        # (register_routes runs once at startup), so this never leaks
+        # across separate app instances.
+        active_streams: dict[str, asyncio.Event] = {}
+
         @fastapi_app.get("/stream/{widget_id}")
         async def mjpeg_stream(widget_id: str) -> StreamingResponse:
             widget = app.page.find(widget_id)
             if not isinstance(widget, ImageStreamWidget):
                 raise HTTPException(status_code=404, detail="Stream not found")
             widget._ensure_provider_running()
+
+            cancel: asyncio.Event | None = None
+            if app.single_session:
+                # The same "newest tab wins" policy already applied to the
+                # WebSocket (see websocket.py's _supersede_existing_sessions),
+                # applied independently here: in single_session mode at
+                # most one browser is ever entitled to a given imagestream,
+                # so a fresh connection for the same widget can only mean a
+                # newer tab replacing an older one. Cutting the old
+                # connection here, server-side, is what actually fixes the
+                # "zombie tab keeps receiving frames" bug -- the frontend's
+                # own supersede handling (see websocket.js/imagestream.js)
+                # is a client-side best-effort on top of this, not a
+                # substitute for it: it needs that tab's JS to run, and
+                # under enough bandwidth the stream itself is exactly what
+                # can stop any JS from running at all (see _mjpeg_chunks).
+                previous = active_streams.get(widget_id)
+                if previous is not None:
+                    previous.set()
+                cancel = asyncio.Event()
+                active_streams[widget_id] = cancel
+
+            async def body() -> AsyncIterator[bytes]:
+                try:
+                    async for chunk in _mjpeg_chunks(widget, cancel):
+                        yield chunk
+                finally:
+                    # Only clear our own registration -- a newer connection
+                    # may already have replaced it (it set `cancel` above,
+                    # which is what got us here), and clearing that one's
+                    # entry out from under it would let a third connection
+                    # start without superseding anyone.
+                    if cancel is not None and active_streams.get(widget_id) is cancel:
+                        del active_streams[widget_id]
+
             return StreamingResponse(
-                _mjpeg_chunks(widget),
+                body(),
                 media_type="multipart/x-mixed-replace; boundary=frame",
             )
