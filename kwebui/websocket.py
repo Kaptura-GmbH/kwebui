@@ -25,6 +25,13 @@ Close codes, server -> client:
         the app on purpose. Also must NOT reconnect: the process isn't
         coming back, so retrying would just be a silent, endless loop of
         connection-refused errors -- see websocket.js.
+    1011 (SEND_FAILED_CLOSE_CODE) -- a standard RFC 6455 code ("internal
+        error"), not one of the two application-private ones above: a
+        *broadcast* to this session failed (its own socket is no longer
+        writable -- see KApp._safe_send), so the server asks this
+        session's own task to close its side too. Unlike the two codes
+        above, an ordinary reconnect IS wanted here -- see websocket.js,
+        which retries on any code other than the two 4000-4999 ones.
 """
 
 from __future__ import annotations
@@ -48,6 +55,10 @@ router = APIRouter()
 #: exactly this). See this module's docstring.
 SUPERSEDED_CLOSE_CODE = 4001
 SHUTDOWN_CLOSE_CODE = 4002
+
+#: Standard RFC 6455 code, not an application-private one -- see this
+#: module's docstring.
+SEND_FAILED_CLOSE_CODE = 1011
 
 
 def _close_all_sessions(app: "KApp", code: int) -> None:
@@ -106,7 +117,21 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     await task
 
             if close_task in done:
-                await websocket.close(code=close_task.result())
+                try:
+                    await websocket.close(code=close_task.result())
+                except RuntimeError:
+                    # request_close() can be triggered by a failed
+                    # broadcast (KApp._safe_send, SEND_FAILED_CLOSE_CODE)
+                    # -- meaning this socket's application_state is
+                    # *already* DISCONNECTED (that failed send is what
+                    # set it) before this close() attempt even runs.
+                    # Starlette's WebSocket.close() then refuses with
+                    # RuntimeError('Cannot call "send" once a close
+                    # message has been sent.') instead of silently
+                    # no-op'ing -- expected here, not a bug: there is
+                    # nothing left to close. Falls through to the same
+                    # clean teardown either way.
+                    pass
                 break
 
             message = receive_task.result()
@@ -116,7 +141,25 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 event_type=message["type"],
                 payload=message.get("payload", {}),
             )
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
+        # RuntimeError alongside WebSocketDisconnect on purpose, not a
+        # blanket safety net: Starlette's WebSocket.receive_json() raises
+        # a plain RuntimeError("WebSocket is not connected...") -- not
+        # WebSocketDisconnect -- if this socket's application_state was
+        # already flipped to DISCONNECTED by something other than this
+        # task's own close() above. That can legitimately happen here: a
+        # *broadcast* to this same session (KApp._safe_send, an entirely
+        # different task) can fail and flip that state the moment this
+        # session's underlying connection turns out to be dead, which
+        # this task's own in-flight receive_json() has no way to know
+        # about yet. Previously uncaught, this crashed the task outright
+        # -- no close frame ever reached the browser, so its onclose
+        # never fired and every further click from that tab silently
+        # went nowhere until a full page reload. Every other source of a
+        # RuntimeError in this loop is already excluded: _dispatch_event
+        # catches and prints its own callback's exceptions rather than
+        # letting them escape, so this except can't accidentally swallow
+        # an unrelated bug in app code.
         pass
     finally:
         app._remove_session(session)

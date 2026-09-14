@@ -278,7 +278,20 @@ class KApp:
         try:
             await session.send(message)
         except Exception:
+            from .websocket import SEND_FAILED_CLOSE_CODE
+
             self._remove_session(session)
+            # Ask this session's own websocket_endpoint task to close its
+            # side too, rather than leaving it to find out the hard way.
+            # This send() failing means the underlying connection is
+            # already gone from the server's point of view -- but this
+            # task (a broadcast, not the session's own) must never call
+            # websocket.close() itself; see Session.request_close()'s
+            # docstring for exactly what goes wrong if it does (the same
+            # hazard, one level removed: a failed send() flips
+            # application_state out from under this session's own
+            # receive_json() loop, same as a foreign close() call would).
+            session.request_close(SEND_FAILED_CLOSE_CODE)
 
     # -- graceful shutdown ----------------------------------------------------
 
