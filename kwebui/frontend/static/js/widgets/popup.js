@@ -26,6 +26,8 @@ registerWidget("popup", {
   },
   methods: {
     label(btn) {
+      const custom = this.data.props.labels?.[btn];
+      if (custom) return custom;
       return { ok: "OK", cancel: "Cancel", yes: "Yes", no: "No" }[btn] || btn;
     },
     answer(btn) {

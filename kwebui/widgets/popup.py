@@ -53,9 +53,12 @@ class PopupPlugin(WidgetPlugin):
     """
     Example:
         self.popup("Delete this item?", kind="yesno", on_return=self.on_delete_answer)
+        self.popup("Delete this item?", kind="yesno", labels={"yes": "Delete", "no": "Keep"},
+                   on_return=self.on_delete_answer)
 
     ``on_return`` is called with one of the strings in the chosen
-    ``kind``'s button set ("ok", "cancel", "yes", or "no").
+    ``kind``'s button set ("ok", "cancel", "yes", or "no") -- ``labels``
+    only changes what's displayed, not the answer key passed back.
     """
 
     widget_name = "popup"
@@ -67,6 +70,7 @@ class PopupPlugin(WidgetPlugin):
         *,
         title: str = "",
         kind: str = "ok",
+        labels: dict[str, str] | None = None,
         on_return: Callable[[str], None] | None = None,
     ) -> PopupWidget:
         if kind not in _BUTTON_SETS:
@@ -76,6 +80,7 @@ class PopupPlugin(WidgetPlugin):
             "title": title,
             "message": message,
             "buttons": list(_BUTTON_SETS[kind]),
+            "labels": labels or {},
             "on_return": on_return,
         }
         return PopupWidget(widget_id, self.widget_name, props)
