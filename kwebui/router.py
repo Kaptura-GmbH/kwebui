@@ -60,7 +60,13 @@ def build_fastapi_app(app: "KApp") -> FastAPI:
         return templates.TemplateResponse(
             request,
             "index.html",
-            {"title": app.title, "theme": app.theme, "width": app.width, "widget_scripts": widget_scripts},
+            {
+                "title": app.title,
+                "theme": app.theme,
+                "width": app.width,
+                "reload_button": app.reload_button,
+                "widget_scripts": widget_scripts,
+            },
         )
 
     @fastapi_app.api_route("/themes/{name}.css", methods=["GET", "HEAD"])

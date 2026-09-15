@@ -23,13 +23,26 @@ const SHUTDOWN_CLOSE_CODE = 4002;
 function showDisconnected(message) {
   const badge = document.getElementById("connection-status");
   if (!badge) return;
-  badge.textContent = message;
+  // Only the text span's content, never the badge's own innerHTML/
+  // textContent -- overwriting the whole badge would also wipe out the
+  // reload button markTerminal() below may have just revealed.
+  document.getElementById("connection-status-text").textContent = message;
   badge.hidden = false;
 }
 
 function hideDisconnected() {
   const badge = document.getElementById("connection-status");
   if (badge) badge.hidden = true;
+}
+
+// KApp(reload_button=...) (default True) -- index.html renders this as a
+// data attribute since it's a fixed, per-app setting rather than
+// something that could change per connection, so no server round trip
+// is needed to know it before the very first close event that might
+// want to show the button.
+function reloadButtonEnabled() {
+  const badge = document.getElementById("connection-status");
+  return !!badge && badge.dataset.reloadButton !== "false";
 }
 
 // This tab is never coming back on its own -- either a newer tab
@@ -41,6 +54,15 @@ function hideDisconnected() {
 // the closed WebSocket does nothing to stop.
 function markTerminal(message) {
   showDisconnected(message);
+  // A terminal tab needs a *manual* way back -- unlike an ordinary
+  // reconnecting close, nothing here will ever retry on its own (see the
+  // close handler below for why). Reloading is that way back regardless
+  // of which terminal reason applies: it reclaims a superseded session,
+  // or reconnects once a stopped app is running again. Opt-out via
+  // KApp(reload_button=False) for a display nobody is meant to touch.
+  if (reloadButtonEnabled()) {
+    document.getElementById("connection-status-reload").hidden = false;
+  }
   // Widgets that hold a live resource watch this and release it -- see
   // imagestream.js, which freezes on its last frame and drops the stream.
   state.terminated = true;
@@ -116,3 +138,11 @@ function connect() {
 
   return ws;
 }
+
+// Wired once, unconditionally -- the button stays hidden until
+// markTerminal() reveals it (and never at all if reload_button=False, in
+// which case this listener simply never fires). Bound here rather than
+// inside markTerminal() so a second terminal event on the same page
+// (can't currently happen -- there's no path back from "terminated" --
+// but kept this way on purpose) can never attach a duplicate listener.
+document.getElementById("connection-status-reload")?.addEventListener("click", () => location.reload());

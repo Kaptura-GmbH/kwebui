@@ -92,6 +92,7 @@ class KApp:
         title: str = "kwebui app",
         width: float | None = None,
         single_session: bool = True,
+        reload_button: bool = True,
     ) -> None:
         """``single_session=True`` (the default) makes the newest browser
         tab the only live one: whenever a tab connects, every
@@ -103,10 +104,21 @@ class KApp:
         Pass ``single_session=False`` to opt back into kwebui's other
         session model -- one shared widget tree broadcast to every
         connected browser -- for an app that is meant to be open on a
-        second monitor or another machine at the same time."""
+        second monitor or another machine at the same time.
+
+        ``reload_button=True`` (the default) puts a "Reload" button next
+        to the badge on a permanently disconnected tab -- superseded by
+        a newer one (``single_session=True``), or the app itself having
+        stopped (``exit()``/Ctrl+C/SIGTERM) -- so reclaiming it (or
+        reconnecting once the app is back) is one click instead of the
+        user needing to know a manual page reload is what's needed.
+        Pass ``reload_button=False`` to omit it and keep only the text
+        badge, e.g. for a kiosk display nobody is meant to interact with
+        by hand."""
         self.title = title
         self.width = width
         self.single_session = single_session
+        self.reload_button = reload_button
         self.page = Page()
         self.registry = WidgetRegistry().discover()
         self.theme = DEFAULT_THEME

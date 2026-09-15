@@ -473,6 +473,9 @@ body.sg-has-sidebar.sg-sidebar-collapsed {
   top: 1rem;
   right: 1rem;
   z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.5rem 0.9rem;
   border-radius: 6px;
   border: 1px solid #dc2626;
@@ -482,6 +485,39 @@ body.sg-has-sidebar.sg-sidebar-collapsed {
   font-size: 0.85rem;
   font-weight: 600;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* `display: flex` above (added so the text + Reload button lay out side
+   by side) is an ID selector, which beats the browser's own UA-stylesheet
+   rule for the `hidden` attribute (a plain, low-specificity attribute
+   selector) -- without this, `hidden` on this element stops doing
+   anything at all, and the badge stays visibly on screen (as `flex`, not
+   `none`) permanently, connected or not, however many times
+   showDisconnected()/hideDisconnected() toggle the attribute. This
+   ID+attribute selector outranks the plain-ID rule above and restores
+   `hidden`'s actual effect. */
+#connection-status[hidden] {
+  display: none;
+}
+
+/* KApp(reload_button=True), the default -- only ever shown on a
+   permanently disconnected tab (see websocket.js's markTerminal()), so
+   its own styling can assume that context rather than needing a
+   variant for the "still auto-retrying" badge state. */
+#connection-status-reload {
+  flex-shrink: 0;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid #dc2626;
+  border-radius: 4px;
+  background: #dc2626;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#connection-status-reload:hover {
+  filter: brightness(1.1);
 }
 
 /* A tab that was permanently disconnected -- superseded by a newer one

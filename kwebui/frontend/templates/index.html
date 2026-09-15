@@ -7,7 +7,10 @@
   <link id="theme-stylesheet" rel="stylesheet" href="/themes/{{ theme }}.css">
 </head>
 <body>
-  <div id="connection-status" hidden>Disconnected &mdash; reconnecting&hellip;</div>
+  <div id="connection-status" hidden data-reload-button="{{ 'true' if reload_button else 'false' }}">
+    <span id="connection-status-text">Disconnected &mdash; reconnecting&hellip;</span>
+    <button id="connection-status-reload" type="button" hidden>Reload</button>
+  </div>
   <div id="topbar-root"></div>
   <main id="app-root"{% if width is not none %} style="--sg-app-width: {{ width }}px;"{% endif %}></main>
 
