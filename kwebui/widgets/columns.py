@@ -32,6 +32,72 @@ from ..widget import Widget
 
 
 class ColumnWidget(Widget):
+    """A column behaves like a ``container`` as well as holding children:
+    it takes the same border/caption/alignment/padding/direction options
+    (see ``ColumnPlugin.create``), so a column can be styled in place
+    instead of needing a ``container`` nested inside it purely for a
+    border or some padding.
+
+    Every one of those options defaults to "off", which is what keeps a
+    plain ``columns(2)`` rendering byte-identical to before they existed:
+    with no border and no caption the column stays the bare flex div it
+    always was (see ``column.js``), and each style key is omitted rather
+    than set to a neutral value.
+
+    ``width``/``stretch`` are deliberately absent, unlike ``container``:
+    a column's width is its share of the row, set by its parent's
+    ``n`` weights (``columns([0.3, 0.7])``), so a second, conflicting way
+    to set it would just be a way to get it wrong.
+    """
+
+    def set_caption(self, caption: str) -> "ColumnWidget":
+        self.update(caption=caption)
+        return self
+
+    def set_border(self, border: bool) -> "ColumnWidget":
+        self.update(border=border)
+        return self
+
+    def set_border_roundness(self, border_roundness: bool) -> "ColumnWidget":
+        self.update(border_roundness=border_roundness)
+        return self
+
+    def set_height(self, height: float) -> "ColumnWidget":
+        self.update(height=height)
+        return self
+
+    def set_direction(self, direction: str) -> "ColumnWidget":
+        self.update(direction=_validate_direction(direction))
+        return self
+
+    def set_wrap(self, wrap: bool) -> "ColumnWidget":
+        self.update(wrap=wrap)
+        return self
+
+    def set_horizontal_alignment(self, horizontal_alignment: str | None) -> "ColumnWidget":
+        self.update(horizontal_alignment=horizontal_alignment)
+        return self
+
+    def set_vertical_alignment(self, vertical_alignment: str | None) -> "ColumnWidget":
+        self.update(vertical_alignment=vertical_alignment)
+        return self
+
+    def set_vertical_padding(self, vertical_padding: float | None) -> "ColumnWidget":
+        self.update(vertical_padding=vertical_padding)
+        return self
+
+    def set_horizontal_padding(self, horizontal_padding: float | None) -> "ColumnWidget":
+        self.update(horizontal_padding=horizontal_padding)
+        return self
+
+    def clear(self) -> "ColumnWidget":
+        """Remove every child -- the same affordance ``container`` and
+        ``empty`` have, which a column previously lacked entirely."""
+        self.children = []
+        if self._app is not None:
+            self._app._on_widget_changed(self)
+        return self
+
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_"):
             raise AttributeError(name)
@@ -84,11 +150,73 @@ class ColumnsWidget(Widget):
             app._on_widget_changed(self)
 
 
+#: Mirrors container's own validation, so the two widgets can't drift.
+_DIRECTIONS = ("vertical", "horizontal")
+
+
+def _validate_direction(direction: str) -> str:
+    if direction not in _DIRECTIONS:
+        raise ValueError(
+            f"Unknown direction {direction!r}. Available: {', '.join(_DIRECTIONS)}."
+        )
+    return direction
+
+
 class ColumnPlugin(WidgetPlugin):
+    """
+    Example:
+        left, right = app.columns(2)
+        left.set_border(True).set_caption("Filters")
+        left.text("Inside a bordered column")
+
+    You never call ``app.column()`` yourself -- ``columns(n)`` creates
+    exactly ``n`` of them. This plugin exists so a column is a first-class
+    widget with its own props and property panel.
+    """
+
     widget_name = "column"
 
-    def create(self, widget_id: str) -> ColumnWidget:
-        return ColumnWidget(widget_id, self.widget_name, {})
+    def create(
+        self,
+        widget_id: str,
+        *,
+        border: bool = False,
+        border_roundness: bool = True,
+        caption: str = "",
+        height: float = -1,
+        direction: str = "vertical",
+        wrap: bool = False,
+        horizontal_alignment: str | None = None,
+        vertical_alignment: str | None = None,
+        vertical_padding: float | None = None,
+        horizontal_padding: float | None = None,
+    ) -> ColumnWidget:
+        """The same layout options as ``container``, minus ``width``/
+        ``stretch`` (a column's width is its share of the row -- see
+        ``ColumnWidget``).
+
+        Note the defaults differ from ``container`` in one place on
+        purpose: ``border`` starts **False** here, where a container
+        starts True. A column has always been an invisible layout slot,
+        and defaulting it to bordered would put a box around every column
+        of every existing ``columns()`` call.
+        """
+        return ColumnWidget(
+            widget_id,
+            self.widget_name,
+            {
+                "border": border,
+                "border_roundness": border_roundness,
+                "caption": caption,
+                "height": height,
+                "direction": _validate_direction(direction),
+                "wrap": wrap,
+                "horizontal_alignment": horizontal_alignment,
+                "vertical_alignment": vertical_alignment,
+                "vertical_padding": vertical_padding,
+                "horizontal_padding": horizontal_padding,
+            },
+        )
 
 
 _WEIGHT_SUM_TOLERANCE = 1e-6

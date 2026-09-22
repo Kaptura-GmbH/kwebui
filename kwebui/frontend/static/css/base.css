@@ -747,3 +747,13 @@ body.sg-terminated #topbar-root {
   color: #dc2626;
   opacity: 0.75;
 }
+
+/* A framed column (border or caption set -- see columns.js) puts a
+   .sg-container fieldset inside the flex column. It has to fill that
+   column rather than shrink to its content the way a standalone
+   container does, since the column's own width is already the share of
+   the row the user asked for. */
+.sg-column-frame {
+  width: 100%;
+  height: 100%;
+}

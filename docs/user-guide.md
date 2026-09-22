@@ -1046,6 +1046,170 @@ app is stopping on purpose (a "Disconnected — the app has stopped."
 badge that, unlike an ordinary disconnect, does not keep retrying against
 a process that isn't coming back) before `run()` returns.
 
+## 10. Designing a page visually (edit mode)
+
+Everything so far builds the page in Python, one widget call at a time.
+`edit_mode=True` turns the same app into a visual editor instead: lay
+widgets out by clicking and dragging in the browser, and it writes what
+you build to a JSON file your app then loads.
+
+```python
+from kwebui import KApp
+from kwebui.editor import load_layout
+
+LAYOUT = "my_app.layout.json"
+
+class MyApp(KApp):
+    def build(self) -> None:
+        self.ui = load_layout(self, LAYOUT)
+        self.ui["save_button"].update(on_click=self.on_save)
+
+    def on_save(self) -> None:
+        ...
+
+if __name__ == "__main__":
+    import sys
+    MyApp(title="My App", edit_mode="--design" in sys.argv).run()
+```
+
+```bash
+python my_app.py --design   # opens the editor
+python my_app.py            # runs the app normally, using the same layout
+```
+
+`--design` here is just this example's own convention for choosing
+between the two — `edit_mode` is a plain constructor argument, so pick
+whatever switch (a flag, an environment variable, a separate script)
+suits your project. The full runnable version of the app above is
+`examples/edit_mode_demo.py`.
+
+### Designing in the browser
+
+![Edit mode: a bordered container, the right-click palette with its search box filtering to "checkbox", and the property panel showing a selected button's breadcrumb, id, properties, handlers, and actions](images/edit-mode-overview.png)
+
+- **Containers get a dashed outline** so you can see them even when
+  they're empty or have no visible border of their own.
+- **Right-click inside a container** to open a palette of every widget
+  type. Start typing to filter it (e.g. "check" narrows it to
+  `checkbox`); click an entry, or use the arrow keys and Enter, to
+  insert it. It appears immediately, with placeholder content so it's
+  never invisible while you're still deciding what to put in it.
+  Right-clicking empty space at the top level inserts there instead of
+  into any particular container.
+- **Click any widget to select it.** Its properties appear on the right:
+  a breadcrumb showing where it sits in the tree (the way back to select
+  a widget that's fully covered by its own children, e.g. a `columns`
+  hidden under its own columns), the **id** field, every constructor
+  parameter derived straight from that widget's own signature (so a
+  newly added widget type gets a working property panel for free), and
+  — separately, at the bottom — **Handlers**, one field per callback
+  parameter (`on_click`, `on_change`, ...). A handler field takes a
+  **method name**, not a value: JSON can't hold a Python function, so
+  typing `on_save` there means "call `self.on_save` on this event", and
+  it's resolved against your app the next time the page loads (see
+  below). Move up/down and Delete are also here.
+- **Click nothing (the page background) to see the page's own
+  properties** instead of a widget's: the main content column's width
+  cap and the theme. Both apply live and are saved the same way a
+  widget's properties are.
+- **Drag a widget to move it** — onto another container to move it
+  there, or up/down within the same one to reorder it. A blue line shows
+  exactly where it will land as you drag.
+- **Drag the gap between two columns** (inside a `columns` widget) to
+  resize them, shown as a percentage split rather than a pixel width —
+  drag a handle and the two columns either side of it share whatever
+  width was there between them.
+- **The main panel grows automatically** if something in it needs more
+  room than the current width allows — an image, a table, a long line of
+  text — so nothing is ever silently clipped while you design; it never
+  shrinks back on its own, only grows.
+
+Every one of these is saved to the layout file as it happens — there is
+no separate save step, and no "unsaved changes" to lose.
+
+Two things only Python code can do, deliberately: only a widget that
+came *from the layout* can be selected, dragged, or edited this way — a
+widget your own `build()` created in code is still shown (so the page
+looks like itself), but dimmed and inert, since there is nowhere in the
+JSON to write its new position or properties back to. And three widget
+types don't appear in the palette at all — `popup`, `toast`, and
+`spinner` are things your app *triggers*, not page structure, so a
+persisted one would either vanish the moment it's answered/times out or
+just sit there inert. `column` is similar in spirit but not identical:
+you never insert one yourself (a `columns` widget creates exactly as
+many as you ask for), but an existing column can still be selected,
+given a border/caption/padding of its own — the same layout properties
+a `container` has — and dropped into like any other container.
+
+### Using the result from Python
+
+`load_layout(app_or_container, path)` reads the file, builds every
+widget it describes, and returns a `dict[str, Widget]` keyed by id — the
+same id you see (and can rename) in the property panel:
+
+```python
+self.ui = load_layout(self, "my_app.layout.json")
+self.ui["save_button"].update(on_click=self.on_save)
+self.ui["status_label"].set_text("Ready")
+```
+
+Any widget the file created is a completely ordinary `Widget` after
+this — `.update(...)`, `.hide()`, `.highlight()`, and every typed
+setter (`set_text`, `set_value`, ...) all work exactly as if you'd
+built it with `self.text(...)` yourself, because that's literally what
+`load_layout` did on your behalf, using the same registry and the same
+`create()` calls.
+
+You can also mix both approaches in one `build()` — some widgets
+written by hand, the rest designed visually — by calling `load_layout`
+after your own widget calls; the widgets it builds are simply appended
+after whatever you already created:
+
+```python
+def build(self) -> None:
+    self.text("Hello World", size=28)
+    self.button("Click Me", on_click=self.on_click)
+
+    self.ui = load_layout(self, Path(__file__).with_name("demo.layout.json"))
+```
+
+`Path(__file__).with_name(...)` finds the layout file next to your
+script regardless of the working directory the app is *run* from, which
+matters once you stop always launching it from the same folder — a
+plain relative string like `"demo.layout.json"` is resolved against the
+current working directory instead, and breaks the moment that changes.
+
+**Wiring a callback** works two ways, and you can mix them:
+
+- **Name it in the editor's Handlers field.** `on_save` there resolves
+  to `self.on_save` on the object you pass as `handlers=` to
+  `load_layout` (your `KApp`/`self` by default) the moment the page
+  loads. Nothing further to do in Python — this is what the screenshot
+  above shows.
+- **Wire it explicitly in Python**, the same as any other widget:
+  `self.ui["save_button"].update(on_click=self.on_save)`. Useful when
+  the callback needs something only available at that point (a value
+  captured in a closure, a conditional handler), or simply if you'd
+  rather keep all your wiring in one place in the code.
+
+If a layout names a handler your app doesn't actually have (a typo, or
+a method you renamed), `load_layout` raises `ValueError` immediately,
+naming the missing method — not a silently-dead button discovered
+later by clicking it.
+
+A `columns` widget's own children are handled for you too: the file
+records them as plain `column` entries with their own ids, and
+`load_layout` matches them onto the columns the widget already creates
+for itself, so `self.ui["left_column"]` works exactly like any other
+id-based lookup even though a bare `app.columns(2)` never lets you name
+its columns yourself.
+
+Only one thing lives outside `props`/`children` in the file: page
+settings (width, theme) are stored separately and applied during
+`load_layout`, before your `build()` goes on to do anything else — so
+the very first page a browser ever sees already has the width and theme
+you set while designing, not a flash of the defaults first.
+
 ## Where to go next
 
 - [`docs/architecture.md`](architecture.md) — how the plugin system,
@@ -1057,4 +1221,6 @@ a process that isn't coming back) before `run()` returns.
   built-in widget on one page), `workflow.py` (a `topbar`'s
   `workflow_tracker` driving which page a `container()` shows),
   `custom_theme.py` (a theme CSS file shipped from your own project),
-  `mjpeg_demo.py` and `daheng_demo.py` (camera-feed widgets in practice).
+  `mjpeg_demo.py` and `daheng_demo.py` (camera-feed widgets in practice),
+  `edit_mode_demo.py` (the visual editor, runnable both ways: `--design`
+  and normal).

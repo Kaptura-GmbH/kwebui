@@ -14,6 +14,7 @@ registerWidget("textedit", {
         ref="field"
         :placeholder="data.props.placeholder"
         :disabled="data.enabled === false"
+        :maxlength="data.props.max_length ?? undefined"
         @input="onInput"
       ></textarea>
       <input
@@ -22,6 +23,7 @@ registerWidget("textedit", {
         :type="data.props.password ? 'password' : 'text'"
         :placeholder="data.props.placeholder"
         :disabled="data.enabled === false"
+        :maxlength="data.props.max_length ?? undefined"
         @input="onInput"
         @keydown.enter="onEnter"
       >

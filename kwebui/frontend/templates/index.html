@@ -5,6 +5,7 @@
   <title>{{ title }}</title>
   <link rel="stylesheet" href="/static/css/base.css">
   <link id="theme-stylesheet" rel="stylesheet" href="/themes/{{ theme }}.css">
+  {% if edit_mode %}<link rel="stylesheet" href="/static/css/editor.css">{% endif %}
 </head>
 <body>
   <div id="connection-status" hidden data-reload-button="{{ 'true' if reload_button else 'false' }}">
@@ -23,5 +24,11 @@
   {% endfor %}
   <script src="/static/js/websocket.js"></script>
   <script src="/static/js/app.js"></script>
+  {# Last on purpose: the editor overlay wraps behaviour the scripts above
+     establish (it suppresses their event handling and drives the same
+     reactive `state`), so it has to run once they exist. Only emitted for
+     KApp(edit_mode=True) -- a normal app serves byte-identical HTML to
+     before this feature existed. #}
+  {% if edit_mode %}<script src="/static/js/editor.js"></script>{% endif %}
 </body>
 </html>

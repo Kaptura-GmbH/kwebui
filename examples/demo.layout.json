@@ -1,0 +1,200 @@
+{
+  "kwebui_layout": 1,
+  "widgets": [
+    {
+      "type": "columns",
+      "id": "columns_1",
+      "props": {
+        "n": [
+          0.33,
+          0.24,
+          0.43
+        ]
+      },
+      "handlers": {},
+      "children": [
+        {
+          "type": "column",
+          "id": "column_1",
+          "props": {
+            "direction": "vertical"
+          },
+          "handlers": {},
+          "children": [
+            {
+              "type": "container",
+              "id": "container_2",
+              "props": {
+                "direction": "horizontal",
+                "stretch": true
+              },
+              "handlers": {},
+              "children": [
+                {
+                  "type": "text",
+                  "id": "text_2",
+                  "props": {
+                    "text": "Text"
+                  },
+                  "handlers": {},
+                  "children": []
+                },
+                {
+                  "type": "button",
+                  "id": "button_4",
+                  "props": {
+                    "text": "Button"
+                  },
+                  "handlers": {},
+                  "children": []
+                },
+                {
+                  "type": "badge",
+                  "id": "badge_1",
+                  "props": {
+                    "text": "Badge"
+                  },
+                  "handlers": {},
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "column",
+          "id": "column_2",
+          "props": {},
+          "handlers": {},
+          "children": [
+            {
+              "type": "text",
+              "id": "text_3",
+              "props": {
+                "text": "Text"
+              },
+              "handlers": {},
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "column",
+          "id": "column_3",
+          "props": {},
+          "handlers": {},
+          "children": [
+            {
+              "type": "text",
+              "id": "text_4",
+              "props": {
+                "text": "Text"
+              },
+              "handlers": {},
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "container",
+      "id": "container_1",
+      "props": {
+        "direction": "horizontal"
+      },
+      "handlers": {},
+      "children": [
+        {
+          "type": "text",
+          "id": "text_1",
+          "props": {
+            "text": "Text "
+          },
+          "handlers": {},
+          "children": []
+        },
+        {
+          "type": "textedit",
+          "id": "textedit_1",
+          "props": {
+            "max_length": 7
+          },
+          "handlers": {},
+          "children": []
+        },
+        {
+          "type": "button",
+          "id": "button_2",
+          "props": {
+            "text": "run",
+            "color": "red"
+          },
+          "handlers": {},
+          "children": []
+        }
+      ]
+    },
+    {
+      "type": "columns",
+      "id": "columns_2",
+      "props": {
+        "n": 3
+      },
+      "handlers": {},
+      "children": [
+        {
+          "type": "column",
+          "id": "column_4",
+          "props": {
+            "border": true,
+            "border_roundness": true
+          },
+          "handlers": {},
+          "children": [
+            {
+              "type": "button",
+              "id": "button_3",
+              "props": {
+                "text": "Button"
+              },
+              "handlers": {},
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "column",
+          "id": "column_5",
+          "props": {
+            "border": true,
+            "border_roundness": true
+          },
+          "handlers": {},
+          "children": [
+            {
+              "type": "button",
+              "id": "button_1",
+              "props": {
+                "text": "Button"
+              },
+              "handlers": {},
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "column",
+          "id": "column_6",
+          "props": {},
+          "handlers": {},
+          "children": []
+        }
+      ]
+    }
+  ],
+  "page": {
+    "theme": "light",
+    "width": 1000
+  }
+}

@@ -1,0 +1,403 @@
+/* Visual edit mode -- only served for KApp(edit_mode=True) (see
+   index.html and editor.py). Everything here is prefixed `kwe-` rather
+   than the framework's own `sg-`, so an editor style can never
+   accidentally win over (or be overridden by) a widget's real styling,
+   and so the whole overlay is greppable as one unit. */
+
+/* Reserve the property panel's column. body already owns padding-left
+   for the sidebar (base.css), so padding-right is the symmetric,
+   non-conflicting way to do this -- #app-root's `margin: 0 auto` then
+   re-centres within whatever is left, exactly as it does for a sidebar. */
+body.kwe-edit {
+  padding-right: var(--kwe-panel-width, 320px);
+}
+
+/* --- container outlines ---------------------------------------------------
+
+   The point of edit mode: see where the containers actually are. Dashed,
+   so it reads as scaffolding rather than as a real border the user might
+   think they styled. `outline` rather than `border` deliberately -- it
+   draws outside the box and so cannot shift any layout, which would
+   otherwise make the page look different in edit mode than at runtime. */
+body.kwe-edit [data-widget-type="container"],
+body.kwe-edit [data-widget-type="sidebar"],
+body.kwe-edit [data-widget-type="topbar"],
+body.kwe-edit [data-widget-type="empty"],
+body.kwe-edit [data-widget-type="columns"],
+body.kwe-edit [data-widget-type="column"] {
+  outline: 1px dashed var(--kwe-outline, #8b5cf6);
+  outline-offset: 2px;
+}
+
+/* A columns is a box you select (to change how many columns it has), and
+   its columns are boxes you insert into -- so both need to read as
+   containers here, and the columns itself needs a strip of its own that
+   is actually clickable rather than being entirely covered by its
+   children. */
+body.kwe-edit [data-widget-type="columns"] {
+  padding: 10px 6px 6px;
+  outline-color: var(--kwe-outline-strong, #6d28d9);
+}
+
+body.kwe-edit [data-widget-type="column"] {
+  min-width: 60px;
+  min-height: 44px;
+}
+
+/* An empty container is a <fieldset> sized `width: max-content` around an
+   empty body -- i.e. it collapses to almost nothing and there is no area
+   left to right-click. These minimums exist purely so a freshly created
+   container is a usable drop target; they apply only in edit mode, so the
+   real page is unaffected. */
+body.kwe-edit [data-widget-type="container"] .sg-container-body,
+body.kwe-edit [data-widget-type="sidebar"],
+body.kwe-edit [data-widget-type="empty"] {
+  min-width: 80px;
+  min-height: 36px;
+}
+
+/* Widgets built by the app's own Python rather than by the layout file.
+   Shown (so the page looks like itself) but not editable -- the editor
+   cannot write them back to JSON, and silently letting someone try would
+   be worse than saying so. */
+body.kwe-edit [data-kwe-owner="code"] {
+  opacity: 0.55;
+}
+
+/* --- selection ------------------------------------------------------------
+
+   Deliberately NOT the framework's own highlight()/[data-highlighted]
+   mechanism: that is server state an app may already be using for its own
+   purposes, and borrowing it would both clobber the app's highlights and
+   need a server round trip per click. This is client-only and instant. */
+body.kwe-edit [data-kwe-selected="true"] {
+  outline: 2px solid var(--kwe-accent, #2563eb) !important;
+  outline-offset: 2px;
+}
+
+/* --- shared chrome -------------------------------------------------------- */
+
+.kwe-ui {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 0.85rem;
+  color: var(--sg-fg);
+}
+
+.kwe-ui input,
+.kwe-ui select,
+.kwe-ui button {
+  font: inherit;
+  color: var(--sg-fg);
+  background: var(--sg-input-bg, var(--sg-bg));
+  border: 1px solid var(--sg-border);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+}
+
+.kwe-ui button {
+  cursor: pointer;
+}
+
+/* --- palette (right-click menu) ------------------------------------------- */
+
+#kwe-palette {
+  position: fixed;
+  z-index: 3000;
+  width: 240px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  background: var(--sg-bg);
+  border: 1px solid var(--sg-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+/* `display: flex` above is an ID selector, which outranks the browser's
+   own UA-stylesheet rule for the `hidden` attribute (a bare, far weaker
+   attribute selector). Without this the palette's `hidden` would do
+   nothing at all: it would sit permanently on screen swallowing clicks
+   meant for the page underneath. This ID+attribute selector outranks the
+   rule above and gives `hidden` its meaning back. Exactly the same trap
+   as #connection-status in base.css -- any rule that sets `display` on an
+   id needs its own `[hidden]` companion. */
+#kwe-palette[hidden] {
+  display: none;
+}
+
+#kwe-palette-target {
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--sg-border);
+  opacity: 0.75;
+  font-size: 0.78rem;
+}
+
+#kwe-palette-search {
+  margin: 0.45rem;
+  border-radius: 4px;
+}
+
+#kwe-palette-list {
+  overflow-y: auto;
+  padding: 0 0.25rem 0.35rem;
+}
+
+.kwe-palette-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  padding: 0.35rem 0.45rem;
+}
+
+.kwe-palette-item:hover,
+.kwe-palette-item.kwe-active {
+  background: var(--kwe-accent, #2563eb);
+  color: #fff;
+}
+
+.kwe-palette-empty {
+  padding: 0.5rem;
+  opacity: 0.6;
+}
+
+/* --- property panel ------------------------------------------------------- */
+
+#kwe-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2500;
+  width: var(--kwe-panel-width, 320px);
+  display: flex;
+  flex-direction: column;
+  background: var(--sg-bg);
+  border-left: 1px solid var(--sg-border);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.12);
+}
+
+#kwe-panel-head {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--sg-border);
+}
+
+#kwe-panel-title {
+  font-weight: 700;
+}
+
+#kwe-panel-path {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  opacity: 0.65;
+  word-break: break-all;
+}
+
+#kwe-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0.75rem 1rem;
+}
+
+.kwe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.6rem;
+}
+
+.kwe-field > label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.kwe-field input[type="text"],
+.kwe-field input[type="number"],
+.kwe-field select {
+  width: 100%;
+}
+
+.kwe-field-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* The id field is the one the user's Python code depends on, so it is
+   visually the primary control rather than just another property. */
+#kwe-field-id input {
+  font-weight: 700;
+}
+
+.kwe-section {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+
+.kwe-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.kwe-danger {
+  border-color: #dc2626 !important;
+  color: #dc2626 !important;
+}
+
+.kwe-hint {
+  opacity: 0.65;
+  line-height: 1.45;
+}
+
+.kwe-error {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #dc2626;
+  border-radius: 4px;
+  color: #dc2626;
+}
+
+/* --- mode banner ---------------------------------------------------------- */
+
+#kwe-banner {
+  position: fixed;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 2400;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: var(--kwe-accent, #2563eb);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+/* --- breadcrumb ------------------------------------------------------------
+
+   The ancestor trail for the selected widget. Load-bearing rather than
+   decorative: a `columns` is covered edge to edge by its own columns, so
+   clicking it always lands on a column instead -- this is the only way
+   back up to it (to change how many columns it has). Same for any widget
+   whose children fill it completely. */
+.kwe-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.72rem;
+}
+
+.kwe-crumb {
+  border: none !important;
+  background: none !important;
+  padding: 0.1rem 0.2rem !important;
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
+.kwe-crumb:hover {
+  opacity: 1;
+}
+
+.kwe-crumb-current {
+  font-weight: 700;
+  opacity: 1;
+  text-decoration: none;
+}
+
+.kwe-crumb-sep {
+  opacity: 0.4;
+}
+
+/* --- column resize handles -------------------------------------------------
+
+   Absolutely positioned over the gaps between a columns' columns, in a
+   layer of their own rather than inside the widget tree -- Vue owns that
+   tree and re-renders it wholesale, which would both delete injected
+   handles and change the very flex layout they measure. */
+#kwe-resizers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 2300;
+}
+
+.kwe-resizer {
+  position: absolute;
+  width: 11px;
+  margin-left: -5px;
+  cursor: col-resize;
+  border-radius: 3px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.kwe-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 1px;
+  background: var(--kwe-outline, #8b5cf6);
+  opacity: 0.45;
+}
+
+.kwe-resizer:hover {
+  background: color-mix(in srgb, var(--kwe-accent, #2563eb) 25%, transparent);
+}
+
+/* While dragging, stop the pointer selecting page text and keep the
+   col-resize cursor even as it leaves the 11px handle. */
+body.kwe-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* --- drag-and-drop reparenting ---------------------------------------------
+
+   Driven by plain mousedown/mousemove/mouseup (kweBeginWidgetDrag in
+   editor.js), not the native HTML5 Drag and Drop API -- these three
+   classes are the visual feedback for that. */
+
+/* The widget actually being picked up. */
+.kwe-dragging {
+  opacity: 0.4;
+}
+
+/* The container currently under the pointer -- shown alongside the
+   line indicator so "which box" and "where in it" are both visible at
+   once, since the line alone can be easy to lose track of once you're
+   several levels deep in nested containers. */
+.kwe-drop-target-container {
+  outline: 2px dashed var(--kwe-accent, #2563eb) !important;
+  outline-offset: 2px;
+}
+
+/* The exact boundary a drop would land on. Sized/positioned in JS
+   (kweShowDropIndicator) to exactly straddle that boundary -- width and
+   height are set per-drop depending on whether the target container
+   lays its children out as a row or a column. */
+#kwe-drop-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2350;
+  background: var(--kwe-accent, #2563eb);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+#kwe-drop-indicator[hidden] {
+  display: none;
+}

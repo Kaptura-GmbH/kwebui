@@ -93,6 +93,7 @@ class KApp:
         width: float | None = None,
         single_session: bool = True,
         reload_button: bool = True,
+        edit_mode: bool = False,
     ) -> None:
         """``single_session=True`` (the default) makes the newest browser
         tab the only live one: whenever a tab connects, every
@@ -114,10 +115,20 @@ class KApp:
         user needing to know a manual page reload is what's needed.
         Pass ``reload_button=False`` to omit it and keep only the text
         badge, e.g. for a kiosk display nobody is meant to interact with
-        by hand."""
+        by hand.
+
+        ``edit_mode=True`` serves the app as a visual editor instead of a
+        running page: container borders become visible, right-click opens
+        a searchable widget palette that inserts into that container,
+        clicking a widget shows its properties on the right, and every
+        change is written back to a JSON layout file (see ``editor.py``
+        and ``load_layout()``). Off by default, and meant to be flipped on
+        only while designing -- in edit mode the page's own callbacks are
+        deliberately not fired, since clicks select widgets instead."""
         self.title = title
         self.width = width
         self.single_session = single_session
+        self.edit_mode = edit_mode
         self.reload_button = reload_button
         self.page = Page()
         self.registry = WidgetRegistry().discover()
@@ -387,6 +398,13 @@ class KApp:
             print(f"Port {port} is in use; using {bound_port} instead.", flush=True)
 
         fastapi_app = build_fastapi_app(self)
+        if self.edit_mode:
+            # Imported here, not at module scope: editor.py imports from
+            # this module, and nothing but an app that actually opted in
+            # should pay for loading it.
+            from .editor import default_layout_path, install_editor
+
+            install_editor(fastapi_app, self, default_layout_path(self, None))
         config = uvicorn.Config(fastapi_app, log_level=log_level)
         # uvicorn skips its own "Uvicorn running on ..." banner whenever
         # sockets= is passed explicitly (it assumes a multi-worker setup

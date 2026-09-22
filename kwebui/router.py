@@ -65,6 +65,7 @@ def build_fastapi_app(app: "KApp") -> FastAPI:
                 "theme": app.theme,
                 "width": app.width,
                 "reload_button": app.reload_button,
+                "edit_mode": app.edit_mode,
                 "widget_scripts": widget_scripts,
             },
         )
